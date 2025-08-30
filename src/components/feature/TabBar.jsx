@@ -11,7 +11,7 @@ export default function TabBar() {
       activeIcon: 'ri-calendar-check-fill'
     },
     {
-      path: '/',
+      path: '/home',
       label: '홈',
       icon: 'ri-home-line',
       activeIcon: 'ri-home-fill'

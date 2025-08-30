@@ -4,10 +4,13 @@ import Attendance from "../pages/attendance/page";
 import MyPage from "../pages/my/page";
 import CreateActivity from "../pages/create-activity/page";
 import ActivityDetail from "../pages/activity-detail/page";
+import LoginPage from "../pages/login/page";
+import SignupPage from "../pages/signup/page";
+import OnboardingPage from "../pages/onboarding/page";
 
 const routes = [
   {
-    path: "/",
+    path: "/home",
     element: <Home />,
   },
   {
@@ -25,6 +28,18 @@ const routes = [
   {
     path: "/activity/:id",
     element: <ActivityDetail />,
+  },
+  {
+    path: "/",
+    element: <LoginPage />,
+  },
+  {
+    path:"/signup",
+    element: <SignupPage/>
+  },
+  {
+    path:"/onboarding",
+    element: <OnboardingPage/>
   },
   {
     path: "*",

@@ -18,6 +18,8 @@ export default function MyPage() {
   const [showTimeEndModal, setShowTimeEndModal] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(true); // 로그인 상태 관리
 
+  const navigator = useNavigate()
+
   // 알림 데이터
   const notifications = [
     {
@@ -417,11 +419,13 @@ export default function MyPage() {
   const handleLogout = () => {
     if (confirm('로그아웃 하시겠습니까?')) {
       setIsLoggedIn(false);
+      navigator("/login")
       alert('로그아웃되었습니다.');
     }
   };
 
   const handleLogin = () => {
+    navigator("/login")
     alert('로그인 페이지로 이동합니다.');
   };
 
