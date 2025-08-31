@@ -42,7 +42,7 @@ export default function Header({ title, unreadCount, isLoggedIn, onNotificationC
                                 </div>
                             )}
                         </button>
-                        {/* {isLoggedIn ? (
+                        {isLoggedIn ? (
                             <button
                                 onClick={handleLogout}
                                 className="w-10 h-10 flex items-center justify-center bg-red-100 rounded-full hover:bg-red-200 transition-colors"
@@ -56,7 +56,7 @@ export default function Header({ title, unreadCount, isLoggedIn, onNotificationC
                             >
                                 <i className="ri-login-box-line text-blue-600"></i>
                             </button>
-                        )} */}
+                        )}
                     </div>
                 </div>
             </div>
