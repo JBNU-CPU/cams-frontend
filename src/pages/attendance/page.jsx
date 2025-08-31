@@ -8,6 +8,7 @@ import Header from '../../components/common/Header';
 import { useNotifications } from '../../hooks/useNotifications';
 import { getNotificationIcon, getNotificationColor } from '../../api/NotificationData';
 import axiosInstance from '../../api/axiosInstance';
+import CountdownTimer from './components/CountdownTimer';
 
 export default function Attendance() {
   const [activeTab, setActiveTab] = useState('attendance');
@@ -35,15 +36,12 @@ export default function Attendance() {
       const fetchOpenSessions = async () => {
         try {
           const response = await axiosInstance.get('/api/session/open-session');
-          const sessions = response.data.map(session => {
-            const expiry = new Date(session.expiresAt);
-            const now = new Date();
-            const diff = Math.max(0, Math.floor((expiry - now) / 1000 / 60));
+          const sessions = response.data.content.map(session => {
             return {
               id: session.sessionId,
-              title: session.activityTitle,
-              leader: session.leaderName,
-              timeLeft: `${diff}분 남음`,
+              title: `${session.activityTitle} (${session.sessionNumber}회차)`,
+              leader: session.createdBy,
+              closedAt: session.closedAt,
             };
           });
           setAvailableAttendance(sessions);
@@ -149,7 +147,7 @@ export default function Attendance() {
                         <div className="text-right">
                           <div className="flex items-center space-x-1 text-orange-600 text-sm font-medium mb-1">
                             <i className="ri-time-line"></i>
-                            <span>{activity.timeLeft}</span>
+                            <CountdownTimer closedAt={activity.closedAt} />
                           </div>
                           <button className="bg-blue-600 text-white px-4 py-1 rounded-lg text-sm font-medium">
                             출석하기
@@ -317,4 +315,3 @@ export default function Attendance() {
     </div>
   );
 }
-
