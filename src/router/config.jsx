@@ -30,16 +30,16 @@ const routes = [
     element: <ActivityDetail />,
   },
   {
-    path: "/",
+    path: "/login",
     element: <LoginPage />,
   },
   {
-    path:"/signup",
-    element: <SignupPage/>
+    path: "/signup",
+    element: <SignupPage />
   },
   {
-    path:"/onboarding",
-    element: <OnboardingPage/>
+    path: "/onboarding",
+    element: <OnboardingPage />
   },
   {
     path: "*",
