@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TabBar from '../../components/feature/TabBar';
 import MyAttendanceManagement from './components/MyAttendanceManagement';
@@ -6,7 +6,9 @@ import ActivityManagement from './components/ActivityManagement';
 import Header from '../../components/common/Header';
 // 1. 커스텀 훅과 알림 UI 헬퍼 함수를 import 합니다.
 import { useNotifications } from '../../hooks/useNotifications';
-import { getNotificationIcon, getNotificationColor } from '../../api/NotificationData'
+import { getNotificationIcon, getNotificationColor } from '../../api/NotificationData';
+import axiosInstance from '../../api/axiosInstance';
+import CountdownTimer from './components/CountdownTimer';
 
 export default function Attendance() {
   const [activeTab, setActiveTab] = useState('attendance');
@@ -27,11 +29,30 @@ export default function Attendance() {
   } = useNotifications();
 
   const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [availableAttendance, setAvailableAttendance] = useState([]);
 
-  const availableAttendance = [
-    { id: '1', title: 'React 스터디 그룹', leader: '김철수', timeLeft: '23분 남음' },
-    { id: '2', title: 'AI 프로젝트 팀', leader: '박영희', timeLeft: '45분 남음' }
-  ];
+  useEffect(() => {
+    if (activeTab === 'attendance') {
+      const fetchOpenSessions = async () => {
+        try {
+          const response = await axiosInstance.get('/api/session/open-session');
+          const sessions = response.data.content.map(session => {
+            return {
+              id: session.sessionId,
+              title: `${session.activityTitle} (${session.sessionNumber}회차)`,
+              leader: session.createdBy,
+              closedAt: session.closedAt,
+            };
+          });
+          setAvailableAttendance(sessions);
+        } catch (error) {
+          console.error('출석 가능한 활동을 불러오는 중 오류가 발생했습니다.', error);
+        }
+      };
+
+      fetchOpenSessions();
+    }
+  }, [activeTab]);
 
   const handleAttendanceClick = (activity) => {
     setSelectedActivity(activity);
@@ -126,7 +147,7 @@ export default function Attendance() {
                         <div className="text-right">
                           <div className="flex items-center space-x-1 text-orange-600 text-sm font-medium mb-1">
                             <i className="ri-time-line"></i>
-                            <span>{activity.timeLeft}</span>
+                            <CountdownTimer closedAt={activity.closedAt} />
                           </div>
                           <button className="bg-blue-600 text-white px-4 py-1 rounded-lg text-sm font-medium">
                             출석하기
@@ -294,4 +315,3 @@ export default function Attendance() {
     </div>
   );
 }
-
