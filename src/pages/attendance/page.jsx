@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TabBar from '../../components/feature/TabBar';
 import MyAttendanceManagement from './components/MyAttendanceManagement';
@@ -6,7 +6,8 @@ import ActivityManagement from './components/ActivityManagement';
 import Header from '../../components/common/Header';
 // 1. 커스텀 훅과 알림 UI 헬퍼 함수를 import 합니다.
 import { useNotifications } from '../../hooks/useNotifications';
-import { getNotificationIcon, getNotificationColor } from '../../api/NotificationData'
+import { getNotificationIcon, getNotificationColor } from '../../api/NotificationData';
+import axiosInstance from '../../api/axiosInstance';
 
 export default function Attendance() {
   const [activeTab, setActiveTab] = useState('attendance');
@@ -27,11 +28,33 @@ export default function Attendance() {
   } = useNotifications();
 
   const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [availableAttendance, setAvailableAttendance] = useState([]);
 
-  const availableAttendance = [
-    { id: '1', title: 'React 스터디 그룹', leader: '김철수', timeLeft: '23분 남음' },
-    { id: '2', title: 'AI 프로젝트 팀', leader: '박영희', timeLeft: '45분 남음' }
-  ];
+  useEffect(() => {
+    if (activeTab === 'attendance') {
+      const fetchOpenSessions = async () => {
+        try {
+          const response = await axiosInstance.get('/api/session/open-session');
+          const sessions = response.data.map(session => {
+            const expiry = new Date(session.expiresAt);
+            const now = new Date();
+            const diff = Math.max(0, Math.floor((expiry - now) / 1000 / 60));
+            return {
+              id: session.sessionId,
+              title: session.activityTitle,
+              leader: session.leaderName,
+              timeLeft: `${diff}분 남음`,
+            };
+          });
+          setAvailableAttendance(sessions);
+        } catch (error) {
+          console.error('출석 가능한 활동을 불러오는 중 오류가 발생했습니다.', error);
+        }
+      };
+
+      fetchOpenSessions();
+    }
+  }, [activeTab]);
 
   const handleAttendanceClick = (activity) => {
     setSelectedActivity(activity);

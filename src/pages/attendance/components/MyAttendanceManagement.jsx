@@ -122,32 +122,6 @@ export default function MyAttendanceManagement() {
         </button>
       </div>
 
-      {/* 활동별 출석 카드 리스트 */}
-      <div className="space-y-3">
-        {filteredActivityStats.map((a) => {
-          const width = Math.round((a.attended / a.total) * 100);
-          return (
-            <div key={a.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-gray-900">{a.name}</h3>
-                <span className="text-sm text-gray-500">{a.attended}/{a.total}회</span>
-              </div>
-
-              <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                <div
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${width}%` }}
-                />
-              </div>
-
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">출석률 {width}%</span>
-                <span className="text-gray-500">연속 출석 {a.streak}회</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
 
       {/* 최근 출석 기록 */}
       <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">

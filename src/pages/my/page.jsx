@@ -5,6 +5,9 @@ import Header from '../../components/common/Header';
 // 1. 커스텀 훅과 알림 UI 헬퍼 함수를 import 합니다.
 import { useNotifications } from '../../hooks/useNotifications';
 import { getNotificationIcon, getNotificationColor } from '../../api/NotificationData';
+import { useDispatch } from 'react-redux';
+import { logout } from '../../store/authSlice';
+import axiosInstance from '../../api/axiosInstance';
 export default function MyPage() {
   const [activeTab, setActiveTab] = useState('profile');
   const [showApplicantsModal, setShowApplicantsModal] = useState(false);
@@ -23,6 +26,7 @@ export default function MyPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(true);
 
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   // useNotifications 훅을 호출하여 알림 관련 모든 로직과 상태를 가져옵니다.
   const {
@@ -52,6 +56,22 @@ export default function MyPage() {
   const [activitiesData, setActivitiesData] = useState(myOpenedActivities);
 
   // --- 핸들러 함수들 ---
+  const handleLogout = async () => {
+    if (window.confirm('로그아웃 하시겠습니까?')) {
+      try {
+        await axiosInstance.post('/logout');
+        dispatch(logout());
+        alert('로그아웃 되었습니다.');
+        navigate('/login');
+      } catch (error) {
+        console.error('Logout failed:', error);
+        // 토큰이 이미 만료되었거나 서버에서 에러가 발생한 경우에도 클라이언트에서는 로그아웃 처리를 강행합니다.
+        dispatch(logout());
+        alert('로그아웃 처리 중 오류가 발생했습니다. 다시 로그인해주세요.');
+        navigate('/login');
+      }
+    }
+  };
   const getStatusColor = (status) => { switch (status) { case '진행 중': case '참여 중': return 'bg-green-100 text-green-700'; case '승인 대기': return 'bg-yellow-100 text-yellow-700'; case '불가': return 'bg-red-100 text-red-700'; default: return 'bg-gray-100 text-gray-700'; } };
   const handleShowApplicants = (e, activity) => { e.preventDefault(); e.stopPropagation(); setSelectedActivity(activity); setShowApplicantsModal(true); };
   const handleRemoveApplicant = (applicantId) => { if (confirm('이 신청자를 삭제하시겠습니까?')) { setActivitiesData(prevData => prevData.map(activity => activity.id === selectedActivity.id ? { ...activity, applicantsList: activity.applicantsList.filter(app => app.id !== applicantId), applicants: activity.applicants - 1 } : activity)); setSelectedActivity(prev => ({ ...prev, applicantsList: prev.applicantsList.filter(app => app.id !== applicantId), applicants: prev.applicants - 1 })); } };
@@ -172,6 +192,15 @@ export default function MyPage() {
                       <div className="text-sm text-gray-600">참여한 활동</div>
                     </div>
                   </div>
+                </div>
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                  <button
+                    onClick={handleLogout}
+                    className="w-full py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors flex items-center justify-center space-x-2"
+                  >
+                    <i className="ri-logout-box-r-line"></i>
+                    <span>로그아웃</span>
+                  </button>
                 </div>
               </div>
             )}
