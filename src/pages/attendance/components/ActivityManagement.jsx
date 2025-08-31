@@ -412,10 +412,10 @@ export default function ActivityManagement() {
         prevData.map((activity) =>
           activity.id === selectedActivity.id
             ? {
-                ...activity,
-                memberList: activity.memberList.filter((member) => member.id !== memberId),
-                members: activity.members - 1,
-              }
+              ...activity,
+              memberList: activity.memberList.filter((member) => member.id !== memberId),
+              members: activity.members - 1,
+            }
             : activity
         )
       );
@@ -523,11 +523,11 @@ export default function ActivityManagement() {
       prevData.map((activity) =>
         activity.id === selectedActivity.id
           ? {
-              ...activity,
-              title: editForm.title,
-              schedule: scheduleString,
-              location: editForm.location,
-            }
+            ...activity,
+            title: editForm.title,
+            schedule: scheduleString,
+            location: editForm.location,
+          }
           : activity
       )
     );
@@ -632,9 +632,8 @@ export default function ActivityManagement() {
                   </div>
 
                   <div
-                    className={`overflow-hidden transition-all duration-300 ${
-                      expandedAttendance[activity.id] ? 'max-h-96' : 'max-h-24'
-                    }`}
+                    className={`overflow-hidden transition-all duration-300 ${expandedAttendance[activity.id] ? 'max-h-96' : 'max-h-24'
+                      }`}
                   >
                     <div className="overflow-y-auto space-y-2" style={{ maxHeight: expandedAttendance[activity.id] ? '384px' : '96px' }}>
                       {activity.memberList
@@ -684,11 +683,10 @@ export default function ActivityManagement() {
                         handleOpenAttendance(activity);
                       }
                     }}
-                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      attendanceOpen[activity.id]
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${attendanceOpen[activity.id]
                         ? 'bg-green-100 text-green-700 hover:bg-green-200'
                         : 'bg-blue-600 text-white hover:bg-blue-700'
-                    }`}
+                      }`}
                   >
                     {attendanceOpen[activity.id] ? '출석 진행 중' : '출석 오픈'}
                   </button>
@@ -753,11 +751,10 @@ export default function ActivityManagement() {
                       <button
                         key={minutes}
                         onClick={() => setCustomTime(minutes.toString())}
-                        className={`py-2 px-3 text-sm rounded-lg border transition-colors ${
-                          customTime === minutes.toString()
+                        className={`py-2 px-3 text-sm rounded-lg border transition-colors ${customTime === minutes.toString()
                             ? 'bg-blue-600 text-white border-blue-600'
                             : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                        }`}
+                          }`}
                       >
                         {minutes}분
                       </button>
@@ -1280,11 +1277,10 @@ export default function ActivityManagement() {
                       key={day}
                       type="button"
                       onClick={() => handleDayToggle(day)}
-                      className={`py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${
-                        editForm.days.includes(day)
+                      className={`py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${editForm.days.includes(day)
                           ? 'bg-blue-600 text-white border-blue-600'
                           : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                      }`}
+                        }`}
                     >
                       {day}
                     </button>
@@ -1315,11 +1311,10 @@ export default function ActivityManagement() {
                         key={time}
                         type="button"
                         onClick={() => handleTimePreset(time)}
-                        className={`py-2 px-3 text-sm rounded-lg border transition-colors ${
-                          editForm.time === time
+                        className={`py-2 px-3 text-sm rounded-lg border transition-colors ${editForm.time === time
                             ? 'bg-blue-600 text-white border-blue-600'
                             : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                        }`}
+                          }`}
                       >
                         {time}
                       </button>
