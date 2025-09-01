@@ -16,6 +16,7 @@ export default function Attendance() {
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [attendanceCode, setAttendanceCode] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
+  const [attendanceError, setAttendanceError] = useState('');
 
   const [isLoggedIn, setIsLoggedIn] = useState(true);
   const navigate = useNavigate();
@@ -59,15 +60,28 @@ export default function Attendance() {
     setShowCodeInput(true);
   };
 
-  const handleCodeSubmit = () => {
-    if (attendanceCode.length === 4) {
-      setShowCodeInput(false);
-      setShowSuccess(true);
-      setAttendanceCode('');
-      setTimeout(() => {
-        setShowSuccess(false);
-        setSelectedActivity(null);
-      }, 2000);
+  const handleCodeSubmit = async () => {
+    setAttendanceError(''); // Clear previous error message
+    if (attendanceCode.length === 4 && selectedActivity) {
+      try {
+        await axiosInstance.post(`/api/attendance/${selectedActivity.id}?attendancesCode=${attendanceCode}`);
+
+        setShowCodeInput(false);
+        setShowSuccess(true);
+        setAttendanceCode('');
+        setTimeout(() => {
+          setShowSuccess(false);
+          setSelectedActivity(null);
+        }, 2000);
+      } catch (error) {
+        if (error.response && error.response.status === 403) {
+          setAttendanceError('출석 코드가 일치하지 않습니다.');
+        } else {
+          console.error('출석 처리 중 오류가 발생했습니다.', error);
+          setAttendanceError('출석 처리 중 오류가 발생했습니다.');
+        }
+        setAttendanceCode('');
+      }
     }
   };
 
@@ -172,6 +186,9 @@ export default function Attendance() {
             <div className="text-center mb-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">출석 코드 입력</h3>
               <p className="text-sm text-gray-600">{selectedActivity?.title}</p>
+              {attendanceError && (
+                <p className="text-red-500 text-sm mt-2">{attendanceError}</p>
+              )}
             </div>
             <div className="flex justify-center space-x-3 mb-8">
               {[0, 1, 2, 3].map((index) => (
