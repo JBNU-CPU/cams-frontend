@@ -10,6 +10,10 @@ import OnboardingPage from "../pages/onboarding/page";
 
 const routes = [
   {
+    path: "/",
+    element: <LoginPage />,
+  },
+  {
     path: "/home",
     element: <Home />,
   },
