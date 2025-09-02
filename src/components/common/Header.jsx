@@ -1,17 +1,24 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { logout } from '../../store/authSlice';
+import { useDispatch } from 'react-redux';
 
 export default function Header({ title, unreadCount, isLoggedIn, onNotificationClick, children }) {
     const navigate = useNavigate();
+    const dispatch = useDispatch();
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
         if (confirm('로그아웃 하시겠습니까?')) {
             // 실제 앱에서는 토큰 삭제 등 로그아웃 처리
+            await dispatch(logout()).unwrap();
+
             alert('로그아웃되었습니다.');
             navigate('/login'); // 로그아웃 후 로그인 페이지로 이동
         }
     };
 
     const handleLogin = () => {
+        console.error('Logout failed:', error);
+        alert('로그아웃 중 오류가 발생했습니다.');
         navigate('/login');
     };
 

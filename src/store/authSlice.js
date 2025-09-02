@@ -23,6 +23,27 @@ export const login = createAsyncThunk(
     }
 );
 
+// 쿠키 삭제 함수
+const deleteCookie = (name) => {
+    document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+};
+
+// 로그아웃 비동기 액션 (Thunk)
+export const logout = createAsyncThunk(
+    'auth/logout',
+    async (_, { rejectWithValue }) => {
+        try {
+            // 서버에 로그아웃 요청을 보내 HttpOnly 쿠키를 제거하도록 함
+            await axiosInstance.post('/logout');
+        } catch (error) {
+            // 서버 요청이 실패하더라도 클라이언트 측 로그아웃은 계속 진행해야 하므로,
+            // 여기서 에러를 reject하여 rejected 상태로 넘깁니다.
+            console.error('Server logout request failed:', error);
+            return rejectWithValue('Server logout failed');
+        }
+    }
+);
+
 // 초기 상태
 const initialState = {
     accessToken: localStorage.getItem('accessToken'),
@@ -37,13 +58,7 @@ const authSlice = createSlice({
     initialState,
     // 동기적인 액션을 처리하는 리듀서
     reducers: {
-        logout: (state) => {
-            localStorage.removeItem('accessToken');
-            state.accessToken = null;
-            state.isLoggedIn = false;
-            state.status = 'idle';
-            state.error = null;
-        },
+        // 기존의 동기 logout 리듀서는 삭제됩니다.
     },
     // 비동기적인 액션(createAsyncThunk)을 처리하는 리듀서
     extraReducers: (builder) => {
@@ -60,12 +75,29 @@ const authSlice = createSlice({
             .addCase(login.rejected, (state, action) => {
                 state.status = 'failed';
                 state.error = action.payload;
+            })
+            // 로그아웃 액션 처리 (성공/실패 시 모두 동일하게 상태 초기화)
+            .addCase(logout.fulfilled, (state) => {
+                localStorage.removeItem('accessToken');
+                deleteCookie('refresh'); // refresh 쿠키 삭제
+                state.accessToken = null;
+                state.isLoggedIn = false;
+                state.status = 'idle';
+                state.error = null;
+            })
+            .addCase(logout.rejected, (state, action) => {
+                localStorage.removeItem('accessToken');
+                deleteCookie('refresh'); // refresh 쿠키 삭제
+                state.accessToken = null;
+                state.isLoggedIn = false;
+                state.status = 'idle';
+                state.error = action.payload; // 서버 에러를 저장할 수 있습니다.
             });
     },
 });
 
 // 액션 생성자(Action Creators) 내보내기
-export const { logout } = authSlice.actions;
+export const { } = authSlice.actions;
 
 // 리듀서 내보내기
 export default authSlice.reducer;
