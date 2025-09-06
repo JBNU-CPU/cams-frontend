@@ -141,7 +141,7 @@ export default function Home() {
   }, [activities, activeCategory, searchKeyword, filters]);
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="relative min-h-screen bg-gray-50 pb-20">
       <Header
         title="전체 활동"
         unreadCount={unreadCount}
@@ -187,12 +187,60 @@ export default function Home() {
         )}
       </div>
 
-      <Link to="/create-activity" className="fixed bottom-20 right-4 w-14 h-14 bg-purple-600 rounded-full flex items-center justify-center shadow-lg hover:opacity-90 transition-all z-30">
+      <Link
+        to="/create-activity"
+        className="absolute bottom-24 right-4 w-14 h-14 bg-purple-600 rounded-full
+                flex items-center justify-center shadow-lg hover:opacity-90
+                transition-all z-50">
         <i className="ri-add-line text-white text-xl"></i>
       </Link>
-
       {showNotificationModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"> <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col"> <div className="px-6 py-4 border-b border-gray-100"> <div className="flex items-center justify-between"> <h3 className="text-lg font-semibold text-gray-900">알림</h3> <button onClick={() => setShowNotificationModal(false)} className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 transition-colors" > <i className="ri-close-line text-gray-600"></i> </button> </div> </div> <div className="flex-1 overflow-y-auto"> {notificationList.length === 0 ? (<div className="text-center py-12"> <i className="ri-notification-off-line text-4xl text-gray-300 mb-4"></i> <p className="text-gray-500">새로운 알림이 없습니다.</p> </div>) : (<div className="divide-y divide-gray-100"> {notificationList.map((notification) => (<div key={notification.id} className={`p-4 hover:bg-gray-50 transition-colors ${!notification.isRead ? 'bg-blue-50' : ''}`} > <div className="flex items-start space-x-3"> <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${getNotificationColor(notification.type)}`}> <i className={`${getNotificationIcon(notification.type)} text-lg`}></i> </div> <div className="flex-1 min-w-0"> <div className="flex items-center justify-between mb-1"> <h4 className="font-medium text-gray-900 truncate">{notification.title}</h4> {!notification.isRead && (<div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0 ml-2"></div>)} </div> <p className="text-sm text-gray-600 mb-1">{notification.message}</p> <p className="text-xs text-gray-500">{notification.time}</p> </div> <button onClick={() => dismissNotification(notification.id)} className="w-8 h-8 flex-shrink-0 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors" aria-label="알림 삭제" > <i className="ri-close-line text-lg"></i> </button> </div> </div>))} </div>)} </div> {notificationList.length > 0 && (<div className="px-6 py-4 bg-gray-50 border-t border-gray-100"> <button onClick={() => { dismissAllNotifications(); setShowNotificationModal(false); }} className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors" > 모든 알림 지우기 </button> </div>)} </div> </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">알림</h3>
+                <button onClick={
+                  () => setShowNotificationModal(false)}
+                  className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 transition-colors" >
+                  <i className="ri-close-line text-gray-600"></i>
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto"> {
+              notificationList.length === 0
+                ? (<div className="text-center py-12">
+                  <i className="ri-notification-off-line text-4xl text-gray-300 mb-4">
+                  </i>
+                  <p className="text-gray-500">새로운 알림이 없습니다.</p> </div>)
+                : (<div className="divide-y divide-gray-100">
+                  {notificationList.map((notification) => (
+                    <div key={notification.id}
+                      className={`p-4 hover:bg-gray-50 transition-colors ${!notification.isRead ? 'bg-blue-50' : ''}`} >
+                      <div className="flex items-start space-x-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${getNotificationColor(notification.type)}`}>
+                          <i className={`${getNotificationIcon(notification.type)} text-lg`}></i>
+                        </div> <div className="flex-1 min-w-0"> <div className="flex items-center justify-between mb-1">
+                          <h4 className="font-medium text-gray-900 truncate">{notification.title}</h4>
+                          {!notification.isRead && (<div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0 ml-2"></div>)}
+                        </div> <p className="text-sm text-gray-600 mb-1">{notification.message}</p>
+                          <p className="text-xs text-gray-500">{notification.time}</p>
+                        </div>
+                        <button onClick={() => dismissNotification(notification.id)}
+                          className="w-8 h-8 flex-shrink-0 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                          aria-label="알림 삭제" >
+                          <i className="ri-close-line text-lg"></i>
+                        </button>
+                      </div>
+                    </div>))}
+                </div>)}
+            </div>
+            {notificationList.length > 0 &&
+              (<div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+                <button onClick={() => { dismissAllNotifications(); setShowNotificationModal(false); }}
+                  className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors" >
+                  모든 알림 지우기
+                </button> </div>)} </div> </div>
       )}
 
       <TabBar />
