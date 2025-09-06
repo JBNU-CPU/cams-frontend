@@ -150,7 +150,11 @@ export default function Home() {
       >
         <div className="flex space-x-2 overflow-x-auto">
           {categories.map((category) => (
-            <button key={category} onClick={() => setActiveCategory(category)} className={`w-24 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${activeCategory === category ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            <button key={category} onClick={() => setActiveCategory(category)}
+              className={`w-24 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${activeCategory === category
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`
+              }>
               {category}
             </button>
           ))}
@@ -167,17 +171,14 @@ export default function Home() {
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredActivities.map((activity, index) => {
-              if (filteredActivities.length === index + 1) {
-                return (
-                  <div ref={lastActivityElementRef} key={activity.id}>
-                    <ActivityCard activity={activity} />
-                  </div>
-                );
-              } else {
-                return <ActivityCard key={activity.id} activity={activity} />;
-              }
-            })}
+            {filteredActivities.map((activity, index) => (
+              <div
+                key={activity.id}
+                ref={index === filteredActivities.length - 1 ? lastActivityElementRef : null}
+              >
+                <ActivityCard activity={activity} />
+              </div>
+            ))}
           </div>
         )}
         {isLoading && hasMore && (
