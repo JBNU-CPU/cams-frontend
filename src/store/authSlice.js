@@ -34,7 +34,7 @@ export const logout = createAsyncThunk(
     async (_, { rejectWithValue }) => {
         try {
             // 서버에 로그아웃 요청을 보내 HttpOnly 쿠키를 제거하도록 함
-            await axiosInstance.post('/logout');
+            // await axiosInstance.post('/logout');
         } catch (error) {
             // 서버 요청이 실패하더라도 클라이언트 측 로그아웃은 계속 진행해야 하므로,
             // 여기서 에러를 reject하여 rejected 상태로 넘깁니다.

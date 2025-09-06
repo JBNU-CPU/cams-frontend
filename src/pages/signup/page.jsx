@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axiosInstance from '../../api/axiosInstance';
 
 export default function SignupPage() {
   const navigate = useNavigate();
@@ -9,7 +10,7 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError(''); // 이전 에러 메시지 초기화
 
@@ -30,15 +31,26 @@ export default function SignupPage() {
     // 2. 실제 회원가입 로직 (studentId로 변경)
     console.log('회원가입 정보:', { name, studentId, password });
 
-    // 회원가입 성공 시
-    alert('회원가입이 완료되었습니다! 프로필을 설정해주세요.');
-    navigate('/onboarding'); // 회원가입 성공 후 온보딩 페이지로 이동
+    const requestBody = {
+      name: name,
+      username: studentId,
+      password: password,
+    };
+
+    try {
+      await axiosInstance.post('/api/member', requestBody);
+      alert('프로필이 성공적으로 저장되었습니다.');
+      navigate('/');
+    } catch (error) {
+      console.error('프로필 업데이트 실패:', error);
+      alert('프로필 저장에 실패했습니다. 다시 시도해주세요.');
+    }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center px-4 py-12">
       <div className="max-w-md w-full mx-auto">
-        
+
         {/* 로고 또는 앱 이름 */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-blue-600" style={{ fontFamily: "'Pacifico', cursive" }}>
@@ -52,7 +64,7 @@ export default function SignupPage() {
         {/* 회원가입 폼 카드 */}
         <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
           <form onSubmit={handleSubmit} className="space-y-6">
-            
+
             {/* 이름 입력 필드 */}
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">이름</label>
@@ -106,7 +118,7 @@ export default function SignupPage() {
                 />
               </div>
             </div>
-            
+
             {/* 비밀번호 확인 필드 */}
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">비밀번호 확인</label>
@@ -128,11 +140,11 @@ export default function SignupPage() {
             {/* 에러 메시지 표시 */}
             {error && (
               <div className="flex items-center space-x-2 text-sm text-red-500">
-                 <i className="ri-error-warning-line"></i>
-                 <span>{error}</span>
+                <i className="ri-error-warning-line"></i>
+                <span>{error}</span>
               </div>
             )}
-            
+
             {/* 회원가입 버튼 */}
             <div>
               <button
