@@ -14,11 +14,19 @@ export default function ActivityManagement() {
     const [attendanceCode, setAttendanceCode] = useState('');
     const [newCode, setNewCode] = useState('');
     const [attendanceOpen, setAttendanceOpen] = useState({});
+    const [activityButtonStatus, setActivityButtonStatus] = useState({});
     const [attendanceTime, setAttendanceTime] = useState(30);
     const [customTime, setCustomTime] = useState('');
     const [timeLeft, setTimeLeft] = useState(0);
     const [timeInterval, setTimeInterval] = useState(null);
     const [presetCode, setPresetCode] = useState('');
+    const [currentSessionId, setCurrentSessionId] = useState(null);
+    const [currentOngoingSession, setCurrentOngoingSession] = useState({});
+    const [showReopenModal, setShowReopenModal] = useState(false); // New state
+    const [reopenSessionData, setReopenSessionData] = useState(null); // New state
+    const [reopenAttendanceCode, setReopenAttendanceCode] = useState(''); // New state
+    const [reopenClosableMinutes, setReopenClosableMinutes] = useState(''); // New state
+    const [lastClosedSession, setLastClosedSession] = useState({}); // New state
 
     // 수정할 활동 정보 상태
     const [editForm, setEditForm] = useState({
@@ -30,20 +38,99 @@ export default function ActivityManagement() {
 
     const [activityData, setActivityData] = useState([]);
 
-    useEffect(() => {
-        const fetchMyCreatedActivities = async () => {
-            try {
-                const response = await axiosInstance.get('/api/me/activity/create');
-                if (response.data && Array.isArray(response.data.content)) {
-                    setActivityData(response.data.content);
-                }
-            } catch (error) {
-                console.error('Error fetching my created activities:', error);
+    const fetchActivitiesAndStatuses = async () => {
+        try {
+            const activityResponse = await axiosInstance.get('/api/me/activity/create');
+            if (!activityResponse.data || !Array.isArray(activityResponse.data.content)) {
+                setActivityData([]);
+                return;
             }
-        };
+            const activities = activityResponse.data.content;
+            setActivityData(activities);
 
-        fetchMyCreatedActivities();
+            const buttonStatuses = {};
+            const openStates = {};
+            const ongoingSessionsData = {};
+            const lastClosedSessionsData = {};
+
+            for (const activity of activities) {
+                try {
+                    const ongoingSessionResponse = await axiosInstance.get(`/api/session/activity/${activity.id}/ongoing`);
+                    const ongoingSession = ongoingSessionResponse.data;
+
+                    if (ongoingSession && ongoingSession.status === 'OPEN') {
+                        buttonStatuses[activity.id] = '출석 진행 중';
+                        openStates[activity.id] = true;
+                        ongoingSessionsData[activity.id] = ongoingSession;
+                    } else {
+                        const sessionResponse = await axiosInstance.get(`/api/session/activity/${activity.id}`);
+                        const sessions = sessionResponse.data.content;
+
+                        const closedSession = sessions.find(s => s.status === 'CLOSED');
+                        if (closedSession) {
+                            buttonStatuses[activity.id] = '출석 마감 됨';
+                            openStates[activity.id] = false;
+                            lastClosedSessionsData[activity.id] = closedSession;
+                        } else {
+                            buttonStatuses[activity.id] = '출석 오픈';
+                            openStates[activity.id] = false;
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Error fetching session for activity ${activity.id}:`, error);
+                    buttonStatuses[activity.id] = '출석 오픈';
+                    openStates[activity.id] = false;
+                }
+            }
+            setActivityButtonStatus(buttonStatuses);
+            setAttendanceOpen(openStates);
+            setCurrentOngoingSession(ongoingSessionsData);
+            setLastClosedSession(lastClosedSessionsData);
+        } catch (error) {
+            console.error('Error fetching my created activities:', error);
+        }
+    };
+
+    useEffect(() => {
+        fetchActivitiesAndStatuses();
     }, []);
+
+    useEffect(() => {
+        let interval;
+        if (showAttendanceModal && selectedActivity && attendanceOpen[selectedActivity.id] && currentOngoingSession[selectedActivity.id]) {
+            const session = currentOngoingSession[selectedActivity.id];
+            setAttendanceCode(session.attendancesCode);
+
+            const calculateTimeLeft = async () => {
+                const closedAt = new Date(session.closedAt);
+                const now = new Date();
+                const diffSeconds = Math.max(0, Math.floor((closedAt.getTime() - now.getTime()) / 1000));
+                setTimeLeft(diffSeconds);
+                if (diffSeconds <= 0) {
+                    clearInterval(interval);
+                    // Explicitly close the session in the backend
+                    try {
+                        await axiosInstance.put(`/api/session/${session.sessionId}`, { status: 'CLOSED' });
+                    } catch (error) {
+                        console.error('Error explicitly closing session in backend:', error);
+                        // Even if backend close fails, proceed with UI update to reflect timer end
+                    }
+
+                    setActivityButtonStatus((prev) => ({ ...prev, [selectedActivity.id]: '출석 마감 됨' }));
+                    setAttendanceOpen((prevOpen) => ({ ...prevOpen, [selectedActivity.id]: false }));
+                    setShowAttendanceModal(false);
+                    setShowTimeEndModal(true);
+                    await fetchActivitiesAndStatuses();
+                }
+            };
+
+            calculateTimeLeft(); // Initial calculation
+            interval = setInterval(calculateTimeLeft, 1000);
+
+            return () => clearInterval(interval); // Cleanup on unmount or dependency change
+        }
+        return () => { if (interval) clearInterval(interval); };
+    }, [showAttendanceModal, selectedActivity, attendanceOpen, currentOngoingSession]);
 
     // 추가된 상태 변수들
     const [attendedMembers, setAttendedMembers] = useState([]);
@@ -87,7 +174,7 @@ export default function ActivityManagement() {
         setAttendanceRate(tempAttendanceRate);
     };
 
-    const handleStartAttendance = () => {
+    const handleStartAttendance = async () => {
         const finalTime = customTime ? parseInt(customTime) : attendanceTime;
         if (finalTime < 1 || finalTime > 120) {
             alert('출석 시간은 1분에서 120분 사이로 설정해주세요.');
@@ -95,37 +182,61 @@ export default function ActivityManagement() {
         }
 
         const code = presetCode || generateAttendanceCode();
-        setAttendanceCode(code);
-        setTimeLeft(finalTime * 60);
-        setAttendanceOpen((prev) => ({ ...prev, [selectedActivity.id]: true }));
 
-        const interval = setInterval(() => {
-            setTimeLeft((prev) => {
-                if (prev <= 1) {
-                    clearInterval(interval);
-                    setAttendanceOpen((prevOpen) => ({ ...prevOpen, [selectedActivity.id]: false })); // 함수형 업데이트
-                    setShowAttendanceModal(false);
-                    setShowTimeEndModal(true);
-                    return 0;
-                }
-                return prev - 1;
+        try {
+            // POST request to start session
+            await axiosInstance.post(`/api/session/${selectedActivity.id}`, {
+                attendanceCode: code,
+                closableAfterMinutes: finalTime,
             });
-        }, 1000);
 
-        setTimeInterval(interval);
+            // Fetch the newly started ongoing session details
+            const ongoingSessionResponse = await axiosInstance.get(`/api/session/activity/${selectedActivity.id}/ongoing`);
+            const newOngoingSession = ongoingSessionResponse.data;
+
+            // Update currentOngoingSession state
+            setCurrentOngoingSession(prev => ({ ...prev, [selectedActivity.id]: newOngoingSession }));
+
+            // Update button status and open state
+            setActivityButtonStatus((prev) => ({ ...prev, [selectedActivity.id]: '출석 진행 중' }));
+            setAttendanceOpen((prev) => ({ ...prev, [selectedActivity.id]: true }));
+            setShowAttendanceModal(true); // Ensure modal is shown with updated data
+
+            // The attendanceCode and timeLeft will be updated by the new useEffect
+            // No need to set them directly here or manage interval here.
+
+        } catch (error) {
+            console.error('Error starting attendance session:', error);
+            alert('출석 세션 시작에 실패했습니다. 다시 시도해주세요.');
+        }
     };
 
-    const handleCloseAttendance = (activityId) => {
-        setAttendanceOpen((prev) => ({ ...prev, [activityId]: false }));
-        setShowAttendanceModal(false);
-        setSelectedActivity(null);
-        setAttendanceCode('');
-        setTimeLeft(0);
-        setCustomTime('');
-        setPresetCode('');
-        if (timeInterval) {
-            clearInterval(timeInterval);
-            setTimeInterval(null);
+    const handleCloseAttendance = async (activityId) => {
+        try {
+            const session = currentOngoingSession[activityId];
+            if (!session || !session.sessionId) {
+                console.error('No ongoing session found for this activity or session ID is missing.');
+                alert('세션 정보를 찾을 수 없습니다.');
+                return;
+            }
+
+            const sessionId = session.sessionId;
+            await axiosInstance.put(`/api/session/${sessionId}`, { status: 'CLOSED' }); // PUT request
+
+            // Re-fetch all activities and statuses to update UI and lastClosedSession
+            await fetchActivitiesAndStatuses();
+
+            // Close the modal after successful update
+            setShowAttendanceModal(false);
+            setSelectedActivity(null);
+            setAttendanceCode('');
+            setTimeLeft(0);
+            setCustomTime('');
+            setPresetCode('');
+            setCurrentSessionId(null); // Clear currentSessionId as well
+        } catch (error) {
+            console.error('Error closing attendance session:', error);
+            alert('출석 세션 마감에 실패했습니다. 다시 시도해주세요.');
         }
     };
 
@@ -187,41 +298,77 @@ export default function ActivityManagement() {
     };
 
     const handleExtendTime = (additionalMinutes) => {
+        // TODO: API call to extend session time
+        // For now, just update timeLeft locally.
         setTimeLeft((prev) => prev + additionalMinutes * 60);
     };
 
     const handleExtendFromEndModal = (additionalMinutes) => {
+        // TODO: API call to extend session time
+        // For now, just update timeLeft locally.
         setTimeLeft(additionalMinutes * 60);
+        setActivityButtonStatus((prev) => ({ ...prev, [selectedActivity.id]: '출석 진행 중' }));
         setAttendanceOpen((prev) => ({ ...prev, [selectedActivity.id]: true }));
         setShowTimeEndModal(false);
         setShowAttendanceModal(true);
 
-        const interval = setInterval(() => {
-            setTimeLeft((prev) => {
-                if (prev <= 1) {
-                    clearInterval(interval);
-                    setAttendanceOpen((prevOpen) => ({ ...prevOpen, [selectedActivity.id]: false }));
-                    setShowAttendanceModal(false);
-                    setShowTimeEndModal(true);
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-
-        setTimeInterval(interval);
+        // The interval logic is now handled by the new useEffect, so remove it from here.
     };
 
-    const handleFinalClose = () => {
-        setShowTimeEndModal(false);
-        setSelectedActivity(null);
-        setAttendanceCode('');
-        setTimeLeft(0);
-        setCustomTime('');
 
-        if (timeInterval) {
-            clearInterval(timeInterval);
-            setTimeInterval(null);
+
+    const handleReopenAttendance = (activity) => {
+        setSelectedActivity(activity);
+        const closedSession = lastClosedSession[activity.id];
+        if (closedSession) {
+            setReopenSessionData(closedSession);
+            setReopenAttendanceCode(closedSession.attendancesCode);
+            // For now, let's use a default value for closableAfterMinutes, e.g., 30 minutes.
+            setReopenClosableMinutes('30'); // Placeholder
+            setShowReopenModal(true);
+        } else {
+            alert('재오픈할 세션 정보를 찾을 수 없습니다.');
+        }
+    };
+
+    const handleConfirmReopen = async () => {
+        if (!reopenSessionData || !reopenSessionData.sessionId) {
+            alert('재오픈할 세션 정보가 유효하지 않습니다.');
+            return;
+        }
+        if (!reopenAttendanceCode.trim() || !reopenClosableMinutes.trim()) {
+            alert('출석 코드와 출석 가능 시간을 입력해주세요.');
+            return;
+        }
+        const minutes = parseInt(reopenClosableMinutes);
+        if (isNaN(minutes) || minutes < 1 || minutes > 120) {
+            alert('출석 시간은 1분에서 120분 사이로 설정해주세요.');
+            return;
+        }
+
+        try {
+            await axiosInstance.patch(`/api/session/${reopenSessionData.sessionId}/info`, {
+                attendanceCode: reopenAttendanceCode,
+                closableAfterMinutes: minutes,
+            });
+
+            // After successful re-open, update UI to reflect ongoing session
+            // Fetch the newly re-opened ongoing session details
+            const ongoingSessionResponse = await axiosInstance.get(`/api/session/activity/${selectedActivity.id}/ongoing`);
+            const newOngoingSession = ongoingSessionResponse.data;
+
+            setCurrentOngoingSession(prev => ({ ...prev, [selectedActivity.id]: newOngoingSession }));
+            setActivityButtonStatus((prev) => ({ ...prev, [selectedActivity.id]: '출석 진행 중' }));
+            setAttendanceOpen((prev) => ({ ...prev, [selectedActivity.id]: true }));
+
+            setShowReopenModal(false);
+            setShowAttendanceModal(true); // Open the ongoing attendance modal
+            setReopenSessionData(null);
+            setReopenAttendanceCode('');
+            setReopenClosableMinutes('');
+        } catch (error) {
+            console.error('Error re-opening session:', error);
+            alert('세션 재오픈에 실패했습니다. 다시 시도해주세요.');
         }
     };
 
@@ -392,85 +539,99 @@ export default function ActivityManagement() {
 
     return (
         <div className="space-y-4">
-            {activityData.length === 0 ? (
-                <div className="text-center py-12">
-                    <i className="ri-folder-open-line text-4xl text-gray-300 mb-4"></i>
-                    <p className="text-gray-500 mb-4">개설한 활동이 없습니다.</p>
-                </div>
-            ) : (
-                activityData
-                    .filter(activity => activity.activityStatus === 'STARTED') // START 상태만 필터링
-                    .map((activity) => (
-                        <div key={activity.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                            {/* 활동 기본 정보 */}
-                            <div className="flex items-start justify-between mb-4">
-                                <div className="flex-1">
-                                    <div className="flex items-center space-x-2 mb-2">
-                                        <h3 className="font-semibold text-gray-900">{activity.title}</h3>
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(activity.activityStatus)}`}>
-                                            {activity.activityStatus === 'NOT_STARTED' && '시작 전'}
-                                            {activity.activityStatus === 'STARTED' && '진행 중'}
-                                            {activity.activityStatus === 'ENDED' && '종료'}
+            {(() => {
+                const displayActivities = activityData.filter(activity => activity.isApproved && activity.activityStatus === 'STARTED');
+                if (displayActivities.length === 0) {
+                    return (
+                        <div className="bg-white rounded-xl p-6 text-center">
+                            <i className="ri-calendar-check-line text-3xl text-gray-300 mb-2"></i>
+                            <p className="text-gray-500">진행 중인 개설 활동이 없습니다.</p>
+                        </div>
+                    );
+                }
+                return displayActivities.map((activity) => (
+                    <div key={activity.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                        {/* 활동 기본 정보 */}
+                        <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                    <h3 className="font-semibold text-gray-900">{activity.title}</h3>
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(activity.activityStatus)}`}>
+                                        {activity.activityStatus === 'NOT_STARTED' && '시작 전'}
+                                        {activity.activityStatus === 'STARTED' && '진행 중'}
+                                        {activity.activityStatus === 'ENDED' && '종료'}
+                                    </span>
+                                </div>
+                                <div className="space-y-1 text-sm text-gray-600">
+                                    <div className="flex items-center">
+                                        <i className="ri-group-line mr-2"></i>
+                                        <span>
+                                            멤버: {activity.participantCount}/{activity.maxParticipants}명
                                         </span>
                                     </div>
-                                    <div className="space-y-1 text-sm text-gray-600">
-                                        <div className="flex items-center">
-                                            <i className="ri-group-line mr-2"></i>
-                                            <span>
-                                                멤버: {activity.participantCount}/{activity.maxParticipants}명
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center">
-                                            <i className="ri-calendar-line mr-2"></i>
-                                            <span>{formatSchedule(activity.recurringSchedules, activity.eventSchedules)}</span>
-                                        </div>
-                                        <div className="flex items-center">
-                                            <i className="ri-map-pin-line mr-2"></i>
-                                            <span>{activity.location}</span>
-                                        </div>
-                                        <div className="flex items-center">
-                                            <i className="ri-play-circle-line mr-2"></i>
-                                            <span>총 {activity.sessionCount}회 진행</span>
-                                        </div>
+                                    <div className="flex items-center">
+                                        <i className="ri-calendar-line mr-2"></i>
+                                        <span>{formatSchedule(activity.recurringSchedules, activity.eventSchedules)}</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <i className="ri-map-pin-line mr-2"></i>
+                                        <span>{activity.location}</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <i className="ri-play-circle-line mr-2"></i>
+                                        <span>총 {activity.sessionCount}회 진행</span>
                                     </div>
                                 </div>
                             </div>
-
-                            {/* 액션 버튼 */}
-                            <div className="flex flex-col space-y-2">
-                                <button
-                                    onClick={() => {
-                                        if (attendanceOpen[activity.id]) {
-                                            setSelectedActivity(activity);
-                                            setShowAttendanceModal(true);
-                                        } else {
-                                            handleOpenAttendance(activity);
-                                        }
-                                    }}
-                                    className={`w-full py-2 rounded-lg text-sm font-medium transition-colors ${attendanceOpen[activity.id]
-                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                                        }`}
-                                >
-                                    {attendanceOpen[activity.id] ? '출석 진행 중' : '출석 오픈'}
-                                </button>
-                                {activity.activityStatus === 'STARTED' && (
-                                    <button
-                                        onClick={() => handleAttendanceManagement(activity)}
-                                        className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium"
-                                    >
-                                        출석 관리
-                                    </button>
-                                )}
-                            </div>
                         </div>
-                    ))
-            )}
+
+                        {/* 액션 버튼 */}
+                        <div className="flex flex-col space-y-2">
+                            <button
+                                onClick={() => {
+                                    setSelectedActivity(activity); // Always set selectedActivity
+                                    if (attendanceOpen[activity.id]) {
+                                        setShowAttendanceModal(true); // Open ongoing modal
+                                    } else if (activityButtonStatus[activity.id] === '출석 마감 됨') {
+                                        handleReopenAttendance(activity); // Open reopen modal
+                                    } else {
+                                        handleOpenAttendance(activity); // Open new attendance modal
+                                    }
+                                }}
+                                className={`w-full py-2 rounded-lg text-sm font-medium transition-colors ${
+                                    activityButtonStatus[activity.id] === '출석 진행 중'
+                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                        : activityButtonStatus[activity.id] === '출석 마감 됨'
+                                        ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' // Change color for re-open
+                                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                                }`}
+                                // Remove disabled attribute
+                            >
+                                {activityButtonStatus[activity.id] || '출석 오픈'}
+                            </button>
+                            {activity.activityStatus === 'STARTED' && (
+                                <button
+                                    onClick={() => handleAttendanceManagement(activity)}
+                                    className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium"
+                                >
+                                    출석 관리
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                ));
+            })()}
 
             {/* 출석 코드 모달 */}
             {showAttendanceModal && selectedActivity && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
-                    <div className="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[85vh] overflow-y-auto">
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[85vh] overflow-y-auto relative">
+                        <button
+                            onClick={() => setShowAttendanceModal(false)}
+                            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 transition-colors z-10"
+                        >
+                            <i className="ri-close-line text-gray-600"></i>
+                        </button>
                         {!attendanceOpen[selectedActivity.id] ? (
                             // 출석 시작 전 - 시간 설정
                             <>
@@ -505,7 +666,7 @@ export default function ActivityManagement() {
                                                 className={`py-2 px-3 text-sm rounded-lg border transition-colors ${customTime === minutes.toString()
                                                     ? 'bg-blue-600 text-white border-blue-600'
                                                     : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                                                    }`}
+                                                }`}
                                             >
                                                 {minutes}분
                                             </button>
@@ -600,28 +761,7 @@ export default function ActivityManagement() {
                                     {timeLeft <= 300 && timeLeft > 0 && <p className="text-xs text-orange-600 mt-1">출석 마감이 임박했습니다!</p>}
                                 </div>
 
-                                {timeLeft > 0 && (
-                                    <div className="mb-6">
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {[5, 10, 15].map((minutes) => (
-                                                <button
-                                                    key={minutes}
-                                                    onClick={() => handleExtendTime(minutes)}
-                                                    className="py-1 px-2 bg-green-100 text-green-700 rounded text-sm font-medium hover:bg-green-200"
-                                                >
-                                                    +{minutes}분
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
 
-                                <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-sm text-gray-600">현재 출석자</span>
-                                        <span className="text-lg font-bold text-gray-900">{attendedMembers.length}명</span>
-                                    </div>
-                                </div>
 
                                 <div className="flex space-x-3">
                                     <button
@@ -642,6 +782,64 @@ export default function ActivityManagement() {
                                 </div>
                             </>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* 출석 재오픈 모달 */}
+            {showReopenModal && selectedActivity && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[85vh] overflow-y-auto relative">
+                        <button
+                            onClick={() => setShowReopenModal(false)}
+                            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 transition-colors z-10"
+                        >
+                            <i className="ri-close-line text-gray-600"></i>
+                        </button>
+                        <div className="text-center mb-6">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">출석 재오픈</h3>
+                            <p className="text-sm text-gray-600">{selectedActivity.title}</p>
+                        </div>
+
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">출석 코드</label>
+                            <input
+                                type="text"
+                                value={reopenAttendanceCode}
+                                onChange={(e) => setReopenAttendanceCode(e.target.value)}
+                                maxLength="4"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-center text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="4자리 숫자"
+                            />
+                        </div>
+
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">출석 가능 시간 (분)</label>
+                            <input
+                                type="number"
+                                min="1"
+                                max="120"
+                                value={reopenClosableMinutes}
+                                onChange={(e) => setReopenClosableMinutes(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-center text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="30"
+                            />
+                            <p className="text-xs text-gray-500 text-center mt-1">
+                                1분 ~ 120분 사이로 입력해주세요
+                            </p>
+                        </div>
+
+                        <div className="flex space-x-3">
+                            <button
+                                onClick={() => setShowReopenModal(false)}
+                                className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium"
+                            >
+                                취소
+                            </button>
+                            <button onClick={handleConfirmReopen} className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium">
+                                재오픈
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -702,8 +900,8 @@ export default function ActivityManagement() {
                                             <span className="text-sm text-gray-600">출석률</span>
                                             <span className="text-lg font-bold text-blue-600">{attendanceRate}%</span>
                                             <span className="text-sm text-gray-500">
-                                                ({attendedMembers.length}/{totalMembers}명)
-                                            </span>
+                        ({attendedMembers.length}/{totalMembers}명)
+                      </span>
                                         </div>
                                     </div>
                                 </div>
@@ -749,8 +947,8 @@ export default function ActivityManagement() {
                                                                     member.status
                                                                 )}`}
                                                             >
-                                                                {member.status}
-                                                            </span>
+                                {member.status}
+                              </span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -913,89 +1111,6 @@ export default function ActivityManagement() {
                 </div>
             )}
 
-            {/* 출석 시간 종료 모달 */}
-            {showTimeEndModal && selectedActivity && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[85vh] overflow-y-auto">
-                        <div className="text-center mb-6">
-                            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <i className="ri-time-line text-2xl text-orange-600"></i>
-                            </div>
-                            <h3 className="text-lg font-semibold text-gray-900 mb-2">출석 시간 종료</h3>
-                            <p className="text-sm text-gray-600">{selectedActivity.title}</p>
-                        </div>
-
-                        <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                            <h4 className="text-sm font-medium text-gray-700 mb-3">출석 결과</h4>
-                            <div className="grid grid-cols-3 gap-4 text-center mb-4">
-                                <div className="bg-white rounded-lg p-3">
-                                    <div className="text-xl font-bold text-blue-600">{attendedMembers.length}</div>
-                                    <div className="text-xs text-gray-600">총 출석자</div>
-                                </div>
-                                <div className="bg-white rounded-lg p-3">
-                                    <div className="text-xl font-bold text-green-600">{attendanceCount}</div>
-                                    <div className="text-xs text-gray-600">정시 출석</div>
-                                </div>
-                                <div className="bg-white rounded-lg p-3">
-                                    <div className="text-xl font-bold text-yellow-600">{lateCount}</div>
-                                    <div className="text-xs text-gray-600">지각</div>
-                                </div>
-                            </div>
-                            <div className="text-center">
-                                <span className="text-sm text-gray-600">출석률 </span>
-                                <span className="text-lg font-bold text-blue-600">{attendanceRate}%</span>
-                            </div>
-                        </div>
-
-                        <div className="mb-6">
-                            <h4 className="text-sm font-medium text-gray-700 mb-3">출석한 멤버</h4>
-                            <div className="max-h-48 overflow-y-auto space-y-2">
-                                {attendedMembers.map((member) => (
-                                    <div key={member.id} className="bg-gray-50 rounded-lg p-3">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div className="font-medium text-gray-900">{member.name}</div>
-                                            <div className="flex items-center space-x-2">
-                                                <span className="text-sm text-gray-600">{member.attendanceTime}</span>
-                                                <span
-                                                    className={`px-2 py-1 rounded-full text-xs font-medium ${getAttendanceStatusColor(member.status)}`}
-                                                >
-                                                    {member.status}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="text-xs text-gray-600">
-                                            {member.studentId} · {member.department}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="mb-6">
-                            <h4 className="text-sm font-medium text-gray-700 mb-3">추가 시간 설정</h4>
-                            <div className="grid grid-cols-4 gap-2 mb-3">
-                                {[5, 10, 15, 30].map((minutes) => (
-                                    <button
-                                        key={minutes}
-                                        onClick={() => handleExtendFromEndModal(minutes)}
-                                        className="py-2 px-3 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors"
-                                    >
-                                        +{minutes}분
-                                    </button>
-                                ))}
-                            </div>
-                            <p className="text-xs text-gray-500 text-center">시간을 연장하면 출석이 다시 시작됩니다</p>
-                        </div>
-
-                        <div className="flex space-x-3">
-                            <button onClick={handleFinalClose} className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium">
-                                출석 완료
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* 활동 수정 모달 */}
             {showEditModal && selectedActivity && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1031,7 +1146,7 @@ export default function ActivityManagement() {
                                             className={`py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${editForm.days.includes(day)
                                                 ? 'bg-blue-600 text-white border-blue-600'
                                                 : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                                                }`}
+                                            }`}
                                         >
                                             {day}
                                         </button>
@@ -1065,7 +1180,7 @@ export default function ActivityManagement() {
                                                 className={`py-2 px-3 text-sm rounded-lg border transition-colors ${editForm.time === time
                                                     ? 'bg-blue-600 text-white border-blue-600'
                                                     : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                                                    }`}
+                                                }`}
                                             >
                                                 {time}
                                             </button>

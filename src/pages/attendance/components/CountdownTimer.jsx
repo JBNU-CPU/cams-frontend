@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 
 // 출석 가능한 활동 남은 시간 실시간 확인용 (분단위)
-export default function CountdownTimer({ closedAt }) {
+export default function CountdownTimer({ closedAt, onExpire }) {
   const calculateTimeLeft = () => {
     if (!closedAt) {
-      return '자동 마감 없음';
+      return { text: '자동 마감 없음', expired: false };
     }
 
     const endTime = new Date(closedAt).getTime();
@@ -12,33 +12,43 @@ export default function CountdownTimer({ closedAt }) {
     const distance = endTime - now;
 
     if (distance <= 0) {
-      return '마감되었습니다.';
+      return { text: '마감되었습니다.', expired: true };
     }
 
     const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
     const seconds = Math.floor((distance % (1000 * 60)) / 1000);
 
-    if (minutes > 0) {
-      return `${minutes}분 ${seconds}초 남음`;
-    } else {
-      return `${seconds}초 남음`;
-    }
+    const text = minutes > 0 ? `${minutes}분 ${seconds}초 남음` : `${seconds}초 남음`;
+    return { text, expired: false };
   };
 
-  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
+  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft().text);
 
   useEffect(() => {
-    if (!closedAt || new Date(closedAt).getTime() - new Date().getTime() <= 0) {
-      setTimeLeft(calculateTimeLeft());
+    const initialCheck = calculateTimeLeft();
+    if (initialCheck.expired) {
+      setTimeLeft(initialCheck.text);
+      if (onExpire) {
+        onExpire();
+      }
       return;
     }
+    
+    setTimeLeft(initialCheck.text);
 
     const timer = setInterval(() => {
-      setTimeLeft(calculateTimeLeft());
+      const result = calculateTimeLeft();
+      setTimeLeft(result.text);
+      if (result.expired) {
+        if (onExpire) {
+          onExpire();
+        }
+        clearInterval(timer);
+      }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [closedAt]);
+  }, [closedAt, onExpire]);
 
   return <span>{timeLeft}</span>;
 }

@@ -67,6 +67,7 @@ export default function Attendance() {
       try {
         await axiosInstance.post(`/api/attendance/${selectedActivity.id}?attendancesCode=${attendanceCode}`);
 
+        setAvailableAttendance(prev => prev.filter(activity => activity.id !== selectedActivity.id));
         setShowCodeInput(false);
         setShowSuccess(true);
         setAttendanceCode('');
@@ -94,6 +95,10 @@ export default function Attendance() {
 
   const handleCodeDelete = () => {
     setAttendanceCode(attendanceCode.slice(0, -1));
+  };
+
+  const handleActivityExpire = (activityId) => {
+    setAvailableAttendance(prev => prev.filter(activity => activity.id !== activityId));
   };
 
   return (
@@ -140,7 +145,6 @@ export default function Attendance() {
         {activeTab === 'attendance' && (
           <div className="space-y-6">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-3">출석 가능한 활동</h2>
               {availableAttendance.length === 0 ? (
                 <div className="bg-white rounded-xl p-6 text-center">
                   <i className="ri-calendar-check-line text-3xl text-gray-300 mb-2"></i>
@@ -162,7 +166,7 @@ export default function Attendance() {
                         <div className="text-right">
                           <div className="flex items-center space-x-1 text-orange-600 text-sm font-medium mb-1">
                             <i className="ri-time-line"></i>
-                            <CountdownTimer closedAt={activity.closedAt} />
+                            <CountdownTimer closedAt={activity.closedAt} onExpire={() => handleActivityExpire(activity.id)} />
                           </div>
                           <button className="bg-blue-600 text-white px-4 py-1 rounded-lg text-sm font-medium">
                             출석하기
@@ -226,7 +230,7 @@ export default function Attendance() {
               </button>
             </div>
             <div className="flex space-x-3">
-              <button
+               <button
                 onClick={() => {
                   setShowCodeInput(false);
                   setAttendanceCode('');
