@@ -36,12 +36,11 @@ export default function LoginPage() {
         <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center px-4">
             <div className="max-w-md w-full mx-auto">
                 <div className="text-center mb-8">
-                    <h1 className="text-4xl font-bold text-blue-600" style={{ fontFamily: "'Pacifico', cursive" }}>
-                        CPU
-                    </h1>
-                    <p className="text-gray-600 mt-2">
-                        활동과 성장을 위한 우리만의 공간
-                    </p>
+                    <img
+                        src="/logo.png"
+                        alt="로고"
+                        className="mx-auto w-full h-auto max-w-[120px] sm:max-w-[160px] md:max-w-[200px]"
+                    />
                 </div>
                 <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
                     <form onSubmit={handleSubmit} className="space-y-6">
