@@ -36,10 +36,11 @@ export default function LoginPage() {
         <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center px-4">
             <div className="max-w-md w-full mx-auto">
                 <div className="text-center mb-8">
-                    <img src="/logo.png" alt="로고" className="mx-auto max-w-[180px] w-full h-auto"/>
-                    <p className="text-gray-600 mt-2">
-                        전북대학교 중앙 IT 동아리 CPU
-                    </p>
+                    <img
+                        src="/logo.png"
+                        alt="로고"
+                        className="mx-auto w-full h-auto max-w-[120px] sm:max-w-[160px] md:max-w-[200px]"
+                    />
                 </div>
                 <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
                     <form onSubmit={handleSubmit} className="space-y-6">

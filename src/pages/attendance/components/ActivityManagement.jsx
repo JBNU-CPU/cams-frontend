@@ -100,6 +100,7 @@ export default function ActivityManagement() {
         if (showAttendanceModal && selectedActivity && attendanceOpen[selectedActivity.id] && currentOngoingSession[selectedActivity.id]) {
             const session = currentOngoingSession[selectedActivity.id];
             setAttendanceCode(session.attendancesCode);
+            setCurrentSessionId(session.sessionId); // 현재 세션 ID 저장
 
             const calculateTimeLeft = async () => {
                 const closedAt = new Date(session.closedAt);
@@ -132,6 +133,76 @@ export default function ActivityManagement() {
         return () => { if (interval) clearInterval(interval); };
     }, [showAttendanceModal, selectedActivity, attendanceOpen, currentOngoingSession]);
 
+    // 현재 출석 현황 모달이 열릴 때 API 호출 및 데이터 업데이트
+    useEffect(() => {
+        const fetchCurrentAttendanceDetails = async () => {
+            if (showCurrentAttendance && selectedActivity && currentOngoingSession[selectedActivity.id]) {
+                const sessionId = currentOngoingSession[selectedActivity.id].sessionId;
+                try {
+                    const response = await axiosInstance.get(`/api/attendance/${sessionId}`);
+                    const attendanceData = response.data;
+
+                    const presentMembers = attendanceData.filter(
+                        (member) => member.attendanceStatus === 'PRESENT'
+                    );
+                    const lateMembers = attendanceData.filter(
+                        (member) => member.attendanceStatus === 'LATE'
+                    );
+                    const absentMembersFromApi = attendanceData.filter(
+                        (member) => member.attendanceStatus === 'ABSENT' || member.attendanceStatus === 'EXCUSED'
+                    );
+
+                    // 출석 완료 멤버 (PRESENT)
+                    setAttendedMembers(presentMembers.map(m => ({
+                        id: m.participantId,
+                        name: m.participantName,
+                        studentId: m.participantId,
+                        department: m.participantDepartment,
+                        status: '출석'
+                    })));
+
+                    // 미출석 멤버 (LATE, ABSENT, EXCUSED)
+                    setNonPresentMembers([
+                        ...lateMembers.map(m => ({
+                            id: m.participantId,
+                            name: m.participantName,
+                            studentId: m.participantId,
+                            department: m.participantDepartment,
+                            status: '지각'
+                        })),
+                        ...absentMembersFromApi.map(m => ({
+                            id: m.participantId,
+                            name: m.participantName,
+                            studentId: m.participantId,
+                            department: m.participantDepartment,
+                            status: m.attendanceStatus === 'ABSENT' ? '결석' : '대기중' // EXCUSED는 대기중으로 표시
+                        }))
+                    ]);
+
+                    setAttendanceCount(presentMembers.length);
+                    setLateCount(lateMembers.length);
+                    setTotalMembers(attendanceData.length); // 전체 멤버 수는 API 응답의 길이
+                    setAttendanceRate(
+                        attendanceData.length > 0
+                            ? Math.round(((presentMembers.length + lateMembers.length) / attendanceData.length) * 100)
+                            : 0
+                    );
+
+                } catch (error) {
+                    console.error('Error fetching current attendance details:', error);
+                    setAttendedMembers([]);
+                    setNonPresentMembers([]);
+                    setAttendanceCount(0);
+                    setLateCount(0);
+                    setTotalMembers(0);
+                    setAttendanceRate(0);
+                }
+            }
+        };
+
+        fetchCurrentAttendanceDetails();
+    }, [showCurrentAttendance, selectedActivity, currentOngoingSession]); // showCurrentAttendance가 true가 될 때마다 실행
+
     // 추가된 상태 변수들
     const [attendedMembers, setAttendedMembers] = useState([]);
     const [attendanceCount, setAttendanceCount] = useState(0);
@@ -139,6 +210,7 @@ export default function ActivityManagement() {
     const [totalMembers, setTotalMembers] = useState(0);
     const [attendanceRate, setAttendanceRate] = useState(0);
     const [expandedAttendance, setExpandedAttendance] = useState({}); // 멤버별 출석 현황 확장/축소 상태
+    const [nonPresentMembers, setNonPresentMembers] = useState([]); // 미출석 멤버를 위한 새로운 상태
 
     const generateAttendanceCode = () => {
         return Math.floor(1000 + Math.random() * 9000).toString();
@@ -156,22 +228,13 @@ export default function ActivityManagement() {
         setCustomTime('');
         setPresetCode('');
 
-        // 출석 오픈 시 임시 데이터로 초기화 (실제로는 API 호출 후 업데이트)
-        const tempAttendedMembers = [
-            { id: 1, name: '김철수', studentId: '20201234', department: '컴퓨터공학과', attendanceTime: '10:00', status: '출석' },
-            { id: 2, name: '이영희', studentId: '20215678', department: '소프트웨어학과', attendanceTime: '10:05', status: '지각' },
-            { id: 3, name: '박민수', studentId: '20199876', department: '정보통신학과', attendanceTime: '10:02', status: '출석' },
-        ];
-        const tempTotalMembers = activity.memberList ? activity.memberList.length : 0;
-        const tempAttendanceCount = tempAttendedMembers.filter(m => m.status === '출석').length;
-        const tempLateCount = tempAttendedMembers.filter(m => m.status === '지각').length;
-        const tempAttendanceRate = tempTotalMembers > 0 ? Math.round((tempAttendedMembers.length / tempTotalMembers) * 100) : 0;
-
-        setAttendedMembers(tempAttendedMembers);
-        setAttendanceCount(tempAttendanceCount);
-        setLateCount(tempLateCount);
-        setTotalMembers(tempTotalMembers);
-        setAttendanceRate(tempAttendanceRate);
+        // 임시 데이터 초기화 제거
+        setAttendedMembers([]);
+        setAttendanceCount(0);
+        setLateCount(0);
+        setTotalMembers(0);
+        setAttendanceRate(0);
+        setNonPresentMembers([]);
     };
 
     const handleStartAttendance = async () => {
@@ -196,6 +259,7 @@ export default function ActivityManagement() {
 
             // Update currentOngoingSession state
             setCurrentOngoingSession(prev => ({ ...prev, [selectedActivity.id]: newOngoingSession }));
+            setCurrentSessionId(newOngoingSession.sessionId); // 새로 시작된 세션 ID 저장
 
             // Update button status and open state
             setActivityButtonStatus((prev) => ({ ...prev, [selectedActivity.id]: '출석 진행 중' }));
@@ -865,46 +929,7 @@ export default function ActivityManagement() {
 
                         <div className="flex-1 overflow-y-auto">
                             <div className="p-6 space-y-6">
-                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center space-x-2">
-                                            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                                                <i className="ri-bar-chart-line text-blue-600"></i>
-                                            </div>
-                                            <span className="font-medium text-gray-900">실시간 통계</span>
-                                        </div>
-                                        {timeLeft > 0 && (
-                                            <div className="bg-orange-100 px-3 py-1 rounded-full">
-                                                <span className="text-sm font-medium text-orange-700">{formatTimeLeft(timeLeft)} 남음</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div className="bg-white/80 backdrop-blur-sm rounded-lg p-3 text-center">
-                                            <div className="text-2xl font-bold text-blue-600 mb-1">{attendedMembers.length}</div>
-                                            <div className="text-xs text-gray-600">총 출석자</div>
-                                        </div>
-                                        <div className="bg-white/80 backdrop-blur-sm rounded-lg p-3 text-center">
-                                            <div className="text-2xl font-bold text-green-600 mb-1">{attendanceCount}</div>
-                                            <div className="text-xs text-gray-600">정시 출석</div>
-                                        </div>
-                                        <div className="bg-white/80 backdrop-blur-sm rounded-lg p-3 text-center">
-                                            <div className="text-2xl font-bold text-yellow-600 mb-1">{lateCount}</div>
-                                            <div className="text-xs text-gray-600">지각</div>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-4 text-center">
-                                        <div className="inline-flex items-center space-x-2 bg-white/80 backdrop-blur-sm rounded-lg px-3 py-1">
-                                            <span className="text-sm text-gray-600">출석률</span>
-                                            <span className="text-lg font-bold text-blue-600">{attendanceRate}%</span>
-                                            <span className="text-sm text-gray-500">
-                        ({attendedMembers.length}/{totalMembers}명)
-                      </span>
-                                        </div>
-                                    </div>
-                                </div>
+                                
 
                                 <div>
                                     <div className="flex items-center justify-between mb-4">
@@ -936,7 +961,7 @@ export default function ActivityManagement() {
                                                             <div>
                                                                 <div className="font-medium text-gray-900">{member.name}</div>
                                                                 <div className="text-xs text-gray-500">
-                                                                    {member.studentId} · {member.department}
+                                                                    {member.department}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -959,9 +984,6 @@ export default function ActivityManagement() {
 
                                 <div>
                                     {(() => {
-                                        const attendedIds = attendedMembers.map((m) => m.id);
-                                        const absentMembers = (selectedActivity.memberList || []).filter((member) => !attendedIds.includes(member.id));
-
                                         return (
                                             <>
                                                 <div className="flex items-center justify-between mb-4">
@@ -971,10 +993,10 @@ export default function ActivityManagement() {
                                                         </div>
                                                         <h4 className="font-medium text-gray-900">미출석</h4>
                                                     </div>
-                                                    <span className="text-sm text-gray-500">{absentMembers.length}명</span>
+                                                    <span className="text-sm text-gray-500">{nonPresentMembers.length}명</span>
                                                 </div>
 
-                                                {absentMembers.length === 0 ? (
+                                                {nonPresentMembers.length === 0 ? (
                                                     <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 text-center">
                                                         <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                                                             <i className="ri-check-line text-green-600 text-xl"></i>
@@ -984,7 +1006,7 @@ export default function ActivityManagement() {
                                                     </div>
                                                 ) : (
                                                     <div className="space-y-2">
-                                                        {absentMembers.map((member) => (
+                                                        {nonPresentMembers.map((member) => (
                                                             <div key={member.id} className="bg-red-50 rounded-lg p-3 border border-red-100">
                                                                 <div className="flex items-center justify-between">
                                                                     <div className="flex items-center space-x-3">
@@ -994,11 +1016,11 @@ export default function ActivityManagement() {
                                                                         <div>
                                                                             <div className="font-medium text-gray-900">{member.name}</div>
                                                                             <div className="text-xs text-gray-500">
-                                                                                {member.studentId} · {member.department}
+                                                                                {member.department}
                                                                             </div>
                                                                         </div>
                                                                     </div>
-                                                                    <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">대기중</span>
+                                                                    <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">{member.status}</span>
                                                                 </div>
                                                             </div>
                                                         ))}
