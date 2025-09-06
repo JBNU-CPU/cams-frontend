@@ -66,6 +66,7 @@ export default function Attendance() {
       try {
         await axiosInstance.post(`/api/attendance/${selectedActivity.id}?attendancesCode=${attendanceCode}`);
 
+        setAvailableAttendance(prev => prev.filter(activity => activity.id !== selectedActivity.id));
         setShowCodeInput(false);
         setShowSuccess(true);
         setAttendanceCode('');
@@ -225,7 +226,7 @@ export default function Attendance() {
               </button>
             </div>
             <div className="flex space-x-3">
-              <button
+               <button
                 onClick={() => {
                   setShowCodeInput(false);
                   setAttendanceCode('');
