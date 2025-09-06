@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import AutoImport from 'unplugin-auto-import/vite'
 import { VitePWA } from "vite-plugin-pwa"
 
-const base = process.env.BASE_PATH || '/'
+const base = '/'
 const isPreview = process.env.IS_PREVIEW ? true : false;
 
 // https://vite.dev/config/
