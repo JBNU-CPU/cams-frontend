@@ -96,6 +96,10 @@ export default function Attendance() {
     setAttendanceCode(attendanceCode.slice(0, -1));
   };
 
+  const handleActivityExpire = (activityId) => {
+    setAvailableAttendance(prev => prev.filter(activity => activity.id !== activityId));
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       <Header
@@ -162,7 +166,7 @@ export default function Attendance() {
                         <div className="text-right">
                           <div className="flex items-center space-x-1 text-orange-600 text-sm font-medium mb-1">
                             <i className="ri-time-line"></i>
-                            <CountdownTimer closedAt={activity.closedAt} />
+                            <CountdownTimer closedAt={activity.closedAt} onExpire={() => handleActivityExpire(activity.id)} />
                           </div>
                           <button className="bg-blue-600 text-white px-4 py-1 rounded-lg text-sm font-medium">
                             출석하기
