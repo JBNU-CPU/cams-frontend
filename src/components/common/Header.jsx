@@ -38,7 +38,7 @@ export default function Header({ title, unreadCount, isLoggedIn, onNotificationC
 
                     {/* 오른쪽 버튼 영역 */}
                     <div className="flex items-center space-x-2">
-                        <button
+                        {/* <button
                             onClick={onNotificationClick}
                             className="relative w-10 h-10 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
                         >
@@ -48,7 +48,7 @@ export default function Header({ title, unreadCount, isLoggedIn, onNotificationC
                                     {unreadCount > 9 ? '9+' : unreadCount}
                                 </div>
                             )}
-                        </button>
+                        </button> */}
                         {isLoggedIn ? (
                             <button
                                 onClick={handleLogout}

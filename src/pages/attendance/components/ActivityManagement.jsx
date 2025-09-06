@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import { useEffect, useState } from 'react';
 import axiosInstance from '@/api/axiosInstance';
 
 export default function ActivityManagement() {
@@ -396,10 +396,6 @@ export default function ActivityManagement() {
                 <div className="text-center py-12">
                     <i className="ri-folder-open-line text-4xl text-gray-300 mb-4"></i>
                     <p className="text-gray-500 mb-4">개설한 활동이 없습니다.</p>
-                    <button className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">
-                        <i className="ri-add-line mr-2"></i>
-                        활동 만들기
-                    </button>
                 </div>
             ) : (
                 activityData
@@ -412,17 +408,17 @@ export default function ActivityManagement() {
                                     <div className="flex items-center space-x-2 mb-2">
                                         <h3 className="font-semibold text-gray-900">{activity.title}</h3>
                                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(activity.activityStatus)}`}>
-                    {activity.activityStatus === 'NOT_STARTED' && '시작 전'}
+                                            {activity.activityStatus === 'NOT_STARTED' && '시작 전'}
                                             {activity.activityStatus === 'STARTED' && '진행 중'}
                                             {activity.activityStatus === 'ENDED' && '종료'}
-                  </span>
+                                        </span>
                                     </div>
                                     <div className="space-y-1 text-sm text-gray-600">
                                         <div className="flex items-center">
                                             <i className="ri-group-line mr-2"></i>
                                             <span>
-                      멤버: {activity.participantCount}/{activity.maxParticipants}명
-                    </span>
+                                                멤버: {activity.participantCount}/{activity.maxParticipants}명
+                                            </span>
                                         </div>
                                         <div className="flex items-center">
                                             <i className="ri-calendar-line mr-2"></i>
@@ -454,7 +450,7 @@ export default function ActivityManagement() {
                                     className={`w-full py-2 rounded-lg text-sm font-medium transition-colors ${attendanceOpen[activity.id]
                                         ? 'bg-green-100 text-green-700 hover:bg-green-200'
                                         : 'bg-blue-600 text-white hover:bg-blue-700'
-                                    }`}
+                                        }`}
                                 >
                                     {attendanceOpen[activity.id] ? '출석 진행 중' : '출석 오픈'}
                                 </button>
@@ -509,7 +505,7 @@ export default function ActivityManagement() {
                                                 className={`py-2 px-3 text-sm rounded-lg border transition-colors ${customTime === minutes.toString()
                                                     ? 'bg-blue-600 text-white border-blue-600'
                                                     : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                                                }`}
+                                                    }`}
                                             >
                                                 {minutes}분
                                             </button>
@@ -706,8 +702,8 @@ export default function ActivityManagement() {
                                             <span className="text-sm text-gray-600">출석률</span>
                                             <span className="text-lg font-bold text-blue-600">{attendanceRate}%</span>
                                             <span className="text-sm text-gray-500">
-                        ({attendedMembers.length}/{totalMembers}명)
-                      </span>
+                                                ({attendedMembers.length}/{totalMembers}명)
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -753,8 +749,8 @@ export default function ActivityManagement() {
                                                                     member.status
                                                                 )}`}
                                                             >
-                                {member.status}
-                              </span>
+                                                                {member.status}
+                                                            </span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -963,8 +959,8 @@ export default function ActivityManagement() {
                                                 <span
                                                     className={`px-2 py-1 rounded-full text-xs font-medium ${getAttendanceStatusColor(member.status)}`}
                                                 >
-                          {member.status}
-                        </span>
+                                                    {member.status}
+                                                </span>
                                             </div>
                                         </div>
                                         <div className="text-xs text-gray-600">
@@ -1035,7 +1031,7 @@ export default function ActivityManagement() {
                                             className={`py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${editForm.days.includes(day)
                                                 ? 'bg-blue-600 text-white border-blue-600'
                                                 : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                                            }`}
+                                                }`}
                                         >
                                             {day}
                                         </button>
@@ -1069,7 +1065,7 @@ export default function ActivityManagement() {
                                                 className={`py-2 px-3 text-sm rounded-lg border transition-colors ${editForm.time === time
                                                     ? 'bg-blue-600 text-white border-blue-600'
                                                     : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                                                }`}
+                                                    }`}
                                             >
                                                 {time}
                                             </button>
