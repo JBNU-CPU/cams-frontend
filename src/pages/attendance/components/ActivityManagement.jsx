@@ -14,12 +14,14 @@ export default function ActivityManagement() {
     const [attendanceCode, setAttendanceCode] = useState('');
     const [newCode, setNewCode] = useState('');
     const [attendanceOpen, setAttendanceOpen] = useState({});
+    const [activityButtonStatus, setActivityButtonStatus] = useState({});
     const [attendanceTime, setAttendanceTime] = useState(30);
     const [customTime, setCustomTime] = useState('');
     const [timeLeft, setTimeLeft] = useState(0);
     const [timeInterval, setTimeInterval] = useState(null);
     const [presetCode, setPresetCode] = useState('');
     const [currentSessionId, setCurrentSessionId] = useState(null);
+    const [currentOngoingSession, setCurrentOngoingSession] = useState({});
 
     // 수정할 활동 정보 상태
     const [editForm, setEditForm] = useState({
@@ -32,19 +34,85 @@ export default function ActivityManagement() {
     const [activityData, setActivityData] = useState([]);
 
     useEffect(() => {
-        const fetchMyCreatedActivities = async () => {
+        const fetchActivitiesAndStatuses = async () => {
             try {
-                const response = await axiosInstance.get('/api/me/activity/create');
-                if (response.data && Array.isArray(response.data.content)) {
-                    setActivityData(response.data.content);
+                const activityResponse = await axiosInstance.get('/api/me/activity/create');
+                if (!activityResponse.data || !Array.isArray(activityResponse.data.content)) {
+                    setActivityData([]);
+                    return;
                 }
+                const activities = activityResponse.data.content;
+                setActivityData(activities);
+
+                const buttonStatuses = {};
+                const openStates = {};
+                const ongoingSessionsData = {}; // Temporary object to build up ongoing session data
+
+                for (const activity of activities) {
+                    try {
+                        const ongoingSessionResponse = await axiosInstance.get(`/api/session/activity/${activity.id}/ongoing`);
+                        const ongoingSession = ongoingSessionResponse.data;
+
+                        if (ongoingSession && ongoingSession.status === 'OPEN') {
+                            buttonStatuses[activity.id] = '출석 진행 중';
+                            openStates[activity.id] = true;
+                            ongoingSessionsData[activity.id] = ongoingSession; // Store the ongoing session data
+                        } else {
+                            const sessionResponse = await axiosInstance.get(`/api/session/activity/${activity.id}`);
+                            const sessions = sessionResponse.data.content;
+
+                            if (sessions && sessions.some(s => s.status === 'CLOSED')) {
+                                buttonStatuses[activity.id] = '출석 마감 됨';
+                                openStates[activity.id] = false;
+                            } else {
+                                buttonStatuses[activity.id] = '출석 오픈';
+                                openStates[activity.id] = false;
+                            }
+                        }
+                    } catch (error) {
+                        console.error(`Error fetching session for activity ${activity.id}:`, error);
+                        buttonStatuses[activity.id] = '출석 오픈';
+                        openStates[activity.id] = false;
+                    }
+                }
+                setActivityButtonStatus(buttonStatuses);
+                setAttendanceOpen(openStates);
+                setCurrentOngoingSession(ongoingSessionsData); // Set the state once after the loop
             } catch (error) {
                 console.error('Error fetching my created activities:', error);
             }
         };
 
-        fetchMyCreatedActivities();
+        fetchActivitiesAndStatuses();
     }, []);
+
+    useEffect(() => {
+        let interval;
+        if (showAttendanceModal && selectedActivity && attendanceOpen[selectedActivity.id] && currentOngoingSession[selectedActivity.id]) {
+            const session = currentOngoingSession[selectedActivity.id];
+            setAttendanceCode(session.attendancesCode);
+
+            const calculateTimeLeft = () => {
+                const closedAt = new Date(session.closedAt);
+                const now = new Date();
+                const diffSeconds = Math.max(0, Math.floor((closedAt.getTime() - now.getTime()) / 1000));
+                setTimeLeft(diffSeconds);
+                if (diffSeconds <= 0) {
+                    clearInterval(interval);
+                    setActivityButtonStatus((prev) => ({ ...prev, [selectedActivity.id]: '출석 마감 됨' }));
+                    setAttendanceOpen((prevOpen) => ({ ...prevOpen, [selectedActivity.id]: false }));
+                    setShowAttendanceModal(false);
+                    setShowTimeEndModal(true);
+                }
+            };
+
+            calculateTimeLeft(); // Initial calculation
+            interval = setInterval(calculateTimeLeft, 1000);
+
+            return () => clearInterval(interval); // Cleanup on unmount or dependency change
+        }
+        return () => { if (interval) clearInterval(interval); };
+    }, [showAttendanceModal, selectedActivity, attendanceOpen, currentOngoingSession]);
 
     // 추가된 상태 변수들
     const [attendedMembers, setAttendedMembers] = useState([]);
@@ -98,32 +166,27 @@ export default function ActivityManagement() {
         const code = presetCode || generateAttendanceCode();
 
         try {
-            const response = await axiosInstance.post(`/api/session/${selectedActivity.id}`, {
+            // POST request to start session
+            await axiosInstance.post(`/api/session/${selectedActivity.id}`, {
                 attendanceCode: code,
                 closableAfterMinutes: finalTime,
             });
 
-            const sessionId = response.data;
-            setCurrentSessionId(sessionId);
+            // Fetch the newly started ongoing session details
+            const ongoingSessionResponse = await axiosInstance.get(`/api/session/activity/${selectedActivity.id}/ongoing`);
+            const newOngoingSession = ongoingSessionResponse.data;
 
-            setAttendanceCode(code);
-            setTimeLeft(finalTime * 60);
+            // Update currentOngoingSession state
+            setCurrentOngoingSession(prev => ({ ...prev, [selectedActivity.id]: newOngoingSession }));
+
+            // Update button status and open state
+            setActivityButtonStatus((prev) => ({ ...prev, [selectedActivity.id]: '출석 진행 중' }));
             setAttendanceOpen((prev) => ({ ...prev, [selectedActivity.id]: true }));
+            setShowAttendanceModal(true); // Ensure modal is shown with updated data
 
-            const interval = setInterval(() => {
-                setTimeLeft((prev) => {
-                    if (prev <= 1) {
-                        clearInterval(interval);
-                        setAttendanceOpen((prevOpen) => ({ ...prevOpen, [selectedActivity.id]: false }));
-                        setShowAttendanceModal(false);
-                        setShowTimeEndModal(true);
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
+            // The attendanceCode and timeLeft will be updated by the new useEffect
+            // No need to set them directly here or manage interval here.
 
-            setTimeInterval(interval);
         } catch (error) {
             console.error('Error starting attendance session:', error);
             alert('출석 세션 시작에 실패했습니다. 다시 시도해주세요.');
@@ -131,6 +194,7 @@ export default function ActivityManagement() {
     };
 
     const handleCloseAttendance = (activityId) => {
+        setActivityButtonStatus((prev) => ({ ...prev, [activityId]: '출석 마감 됨' }));
         setAttendanceOpen((prev) => ({ ...prev, [activityId]: false }));
         setShowAttendanceModal(false);
         setSelectedActivity(null);
@@ -138,10 +202,13 @@ export default function ActivityManagement() {
         setTimeLeft(0);
         setCustomTime('');
         setPresetCode('');
-        if (timeInterval) {
-            clearInterval(timeInterval);
-            setTimeInterval(null);
-        }
+        // Clear the ongoing session data for this activity
+        setCurrentOngoingSession(prev => {
+            const newState = { ...prev };
+            delete newState[activityId];
+            return newState;
+        });
+        // No need to clear timeInterval here as it's managed by useEffect
     };
 
     const handleRefreshCode = () => {
@@ -202,42 +269,39 @@ export default function ActivityManagement() {
     };
 
     const handleExtendTime = (additionalMinutes) => {
+        // TODO: API call to extend session time
+        // For now, just update timeLeft locally.
         setTimeLeft((prev) => prev + additionalMinutes * 60);
     };
 
     const handleExtendFromEndModal = (additionalMinutes) => {
+        // TODO: API call to extend session time
+        // For now, just update timeLeft locally.
         setTimeLeft(additionalMinutes * 60);
+        setActivityButtonStatus((prev) => ({ ...prev, [selectedActivity.id]: '출석 진행 중' }));
         setAttendanceOpen((prev) => ({ ...prev, [selectedActivity.id]: true }));
         setShowTimeEndModal(false);
         setShowAttendanceModal(true);
 
-        const interval = setInterval(() => {
-            setTimeLeft((prev) => {
-                if (prev <= 1) {
-                    clearInterval(interval);
-                    setAttendanceOpen((prevOpen) => ({ ...prevOpen, [selectedActivity.id]: false }));
-                    setShowAttendanceModal(false);
-                    setShowTimeEndModal(true);
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-
-        setTimeInterval(interval);
+        // The interval logic is now handled by the new useEffect, so remove it from here.
     };
 
     const handleFinalClose = () => {
         setShowTimeEndModal(false);
+        setActivityButtonStatus((prev) => ({ ...prev, [selectedActivity.id]: '출석 마감 됨' }));
         setSelectedActivity(null);
         setAttendanceCode('');
         setTimeLeft(0);
         setCustomTime('');
-
-        if (timeInterval) {
-            clearInterval(timeInterval);
-            setTimeInterval(null);
-        }
+        // Clear the ongoing session data for this activity
+        setCurrentOngoingSession(prev => {
+            const newState = { ...prev };
+            if (selectedActivity && selectedActivity.id) {
+                delete newState[selectedActivity.id];
+            }
+            return newState;
+        });
+        // No need to clear timeInterval here as it's managed by useEffect
     };
 
     const handleAttendanceManagement = async (activity) => {
@@ -413,7 +477,7 @@ export default function ActivityManagement() {
                     return (
                         <div className="bg-white rounded-xl p-6 text-center">
                             <i className="ri-calendar-check-line text-3xl text-gray-300 mb-2"></i>
-                            <p className="text-gray-500">승인된 개설 활동이 없습니다.</p>
+                            <p className="text-gray-500">진행 중인 개설 활동이 없습니다.</p>
                         </div>
                     );
                 }
@@ -464,12 +528,16 @@ export default function ActivityManagement() {
                                         handleOpenAttendance(activity);
                                     }
                                 }}
-                                className={`w-full py-2 rounded-lg text-sm font-medium transition-colors ${attendanceOpen[activity.id]
-                                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                                    }`}
+                                className={`w-full py-2 rounded-lg text-sm font-medium transition-colors ${
+                                    activityButtonStatus[activity.id] === '출석 진행 중'
+                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                        : activityButtonStatus[activity.id] === '출석 마감 됨'
+                                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                                }`}
+                                disabled={activityButtonStatus[activity.id] === '출석 마감 됨'}
                             >
-                                {attendanceOpen[activity.id] ? '출석 진행 중' : '출석 오픈'}
+                                {activityButtonStatus[activity.id] || '출석 오픈'}
                             </button>
                             {activity.activityStatus === 'STARTED' && (
                                 <button
