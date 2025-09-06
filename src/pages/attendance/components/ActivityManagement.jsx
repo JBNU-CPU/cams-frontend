@@ -19,6 +19,7 @@ export default function ActivityManagement() {
     const [timeLeft, setTimeLeft] = useState(0);
     const [timeInterval, setTimeInterval] = useState(null);
     const [presetCode, setPresetCode] = useState('');
+    const [currentSessionId, setCurrentSessionId] = useState(null);
 
     // 수정할 활동 정보 상태
     const [editForm, setEditForm] = useState({
@@ -87,7 +88,7 @@ export default function ActivityManagement() {
         setAttendanceRate(tempAttendanceRate);
     };
 
-    const handleStartAttendance = () => {
+    const handleStartAttendance = async () => {
         const finalTime = customTime ? parseInt(customTime) : attendanceTime;
         if (finalTime < 1 || finalTime > 120) {
             alert('출석 시간은 1분에서 120분 사이로 설정해주세요.');
@@ -95,24 +96,38 @@ export default function ActivityManagement() {
         }
 
         const code = presetCode || generateAttendanceCode();
-        setAttendanceCode(code);
-        setTimeLeft(finalTime * 60);
-        setAttendanceOpen((prev) => ({ ...prev, [selectedActivity.id]: true }));
 
-        const interval = setInterval(() => {
-            setTimeLeft((prev) => {
-                if (prev <= 1) {
-                    clearInterval(interval);
-                    setAttendanceOpen((prevOpen) => ({ ...prevOpen, [selectedActivity.id]: false })); // 함수형 업데이트
-                    setShowAttendanceModal(false);
-                    setShowTimeEndModal(true);
-                    return 0;
-                }
-                return prev - 1;
+        try {
+            const response = await axiosInstance.post(`/api/session/${selectedActivity.id}`, {
+                attendanceCode: code,
+                closableAfterMinutes: finalTime,
             });
-        }, 1000);
 
-        setTimeInterval(interval);
+            const sessionId = response.data;
+            setCurrentSessionId(sessionId);
+
+            setAttendanceCode(code);
+            setTimeLeft(finalTime * 60);
+            setAttendanceOpen((prev) => ({ ...prev, [selectedActivity.id]: true }));
+
+            const interval = setInterval(() => {
+                setTimeLeft((prev) => {
+                    if (prev <= 1) {
+                        clearInterval(interval);
+                        setAttendanceOpen((prevOpen) => ({ ...prevOpen, [selectedActivity.id]: false }));
+                        setShowAttendanceModal(false);
+                        setShowTimeEndModal(true);
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+
+            setTimeInterval(interval);
+        } catch (error) {
+            console.error('Error starting attendance session:', error);
+            alert('출석 세션 시작에 실패했습니다. 다시 시도해주세요.');
+        }
     };
 
     const handleCloseAttendance = (activityId) => {
@@ -393,8 +408,8 @@ export default function ActivityManagement() {
     return (
         <div className="space-y-4">
             {(() => {
-                const startedActivities = activityData.filter(activity => activity.activityStatus === 'STARTED');
-                if (startedActivities.length === 0) {
+                const displayActivities = activityData.filter(activity => activity.isApproved && activity.activityStatus === 'STARTED');
+                if (displayActivities.length === 0) {
                     return (
                         <div className="bg-white rounded-xl p-6 text-center">
                             <i className="ri-calendar-check-line text-3xl text-gray-300 mb-2"></i>
@@ -402,7 +417,7 @@ export default function ActivityManagement() {
                         </div>
                     );
                 }
-                return startedActivities.map((activity) => (
+                return displayActivities.map((activity) => (
                     <div key={activity.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                         {/* 활동 기본 정보 */}
                         <div className="flex items-start justify-between mb-4">
@@ -472,7 +487,13 @@ export default function ActivityManagement() {
             {/* 출석 코드 모달 */}
             {showAttendanceModal && selectedActivity && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
-                    <div className="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[85vh] overflow-y-auto">
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[85vh] overflow-y-auto relative">
+                        <button
+                            onClick={() => setShowAttendanceModal(false)}
+                            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 transition-colors z-10"
+                        >
+                            <i className="ri-close-line text-gray-600"></i>
+                        </button>
                         {!attendanceOpen[selectedActivity.id] ? (
                             // 출석 시작 전 - 시간 설정
                             <>
@@ -602,28 +623,7 @@ export default function ActivityManagement() {
                                     {timeLeft <= 300 && timeLeft > 0 && <p className="text-xs text-orange-600 mt-1">출석 마감이 임박했습니다!</p>}
                                 </div>
 
-                                {timeLeft > 0 && (
-                                    <div className="mb-6">
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {[5, 10, 15].map((minutes) => (
-                                                <button
-                                                    key={minutes}
-                                                    onClick={() => handleExtendTime(minutes)}
-                                                    className="py-1 px-2 bg-green-100 text-green-700 rounded text-sm font-medium hover:bg-green-200"
-                                                >
-                                                    +{minutes}분
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-sm text-gray-600">현재 출석자</span>
-                                        <span className="text-lg font-bold text-gray-900">{attendedMembers.length}명</span>
-                                    </div>
-                                </div>
+                                
 
                                 <div className="flex space-x-3">
                                     <button
