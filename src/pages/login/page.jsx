@@ -36,11 +36,9 @@ export default function LoginPage() {
         <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center px-4">
             <div className="max-w-md w-full mx-auto">
                 <div className="text-center mb-8">
-                    <h1 className="text-4xl font-bold text-blue-600" style={{ fontFamily: "'Pacifico', cursive" }}>
-                        CPU
-                    </h1>
+                    <img src="/logo.png" alt="로고" className="mx-auto max-w-[180px] w-full h-auto"/>
                     <p className="text-gray-600 mt-2">
-                        활동과 성장을 위한 우리만의 공간
+                        전북대학교 중앙 IT 동아리 CPU
                     </p>
                 </div>
                 <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
