@@ -8,6 +8,7 @@ export default function MyAttendanceManagement() {
   const [participatingActivities, setParticipatingActivities] = useState([
     { id: 'all', name: '전체' },
   ]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchActivities = async () => {
@@ -63,6 +64,8 @@ export default function MyAttendanceManagement() {
         }
       } catch (error) {
         console.error('Error fetching my attendances:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -192,6 +195,22 @@ export default function MyAttendanceManagement() {
     return map[status] || 'bg-gray-100 text-gray-700';
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-10">
+        <p className="text-gray-500">출석 정보를 불러오는 중입니다...</p>
+      </div>
+    );
+  }
+
+  if (myAttendances.length === 0) {
+    return (
+        <div className="bg-white rounded-xl p-6 text-center">
+            <i className="ri-calendar-check-line text-3xl text-gray-300 mb-2"></i>
+            <p className="text-gray-500">현재 참여 중인 활동이 없습니다.</p>
+        </div>
+    );
+  }
   return (
     <div className="space-y-6">
 

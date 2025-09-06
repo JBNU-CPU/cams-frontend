@@ -144,7 +144,6 @@ export default function Attendance() {
         {activeTab === 'attendance' && (
           <div className="space-y-6">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-3">출석 가능한 활동</h2>
               {availableAttendance.length === 0 ? (
                 <div className="bg-white rounded-xl p-6 text-center">
                   <i className="ri-calendar-check-line text-3xl text-gray-300 mb-2"></i>

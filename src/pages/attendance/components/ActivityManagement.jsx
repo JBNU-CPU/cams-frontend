@@ -392,84 +392,82 @@ export default function ActivityManagement() {
 
     return (
         <div className="space-y-4">
-            {activityData.length === 0 ? (
-                <div className="text-center py-12">
-                    <i className="ri-folder-open-line text-4xl text-gray-300 mb-4"></i>
-                    <p className="text-gray-500 mb-4">개설한 활동이 없습니다.</p>
-                    <button className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">
-                        <i className="ri-add-line mr-2"></i>
-                        활동 만들기
-                    </button>
-                </div>
-            ) : (
-                activityData
-                    .filter(activity => activity.activityStatus === 'STARTED') // START 상태만 필터링
-                    .map((activity) => (
-                        <div key={activity.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                            {/* 활동 기본 정보 */}
-                            <div className="flex items-start justify-between mb-4">
-                                <div className="flex-1">
-                                    <div className="flex items-center space-x-2 mb-2">
-                                        <h3 className="font-semibold text-gray-900">{activity.title}</h3>
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(activity.activityStatus)}`}>
-                    {activity.activityStatus === 'NOT_STARTED' && '시작 전'}
-                                            {activity.activityStatus === 'STARTED' && '진행 중'}
-                                            {activity.activityStatus === 'ENDED' && '종료'}
-                  </span>
+            {(() => {
+                const startedActivities = activityData.filter(activity => activity.activityStatus === 'STARTED');
+                if (startedActivities.length === 0) {
+                    return (
+                        <div className="bg-white rounded-xl p-6 text-center">
+                            <i className="ri-calendar-check-line text-3xl text-gray-300 mb-2"></i>
+                            <p className="text-gray-500">승인된 개설 활동이 없습니다.</p>
+                        </div>
+                    );
+                }
+                return startedActivities.map((activity) => (
+                    <div key={activity.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                        {/* 활동 기본 정보 */}
+                        <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                    <h3 className="font-semibold text-gray-900">{activity.title}</h3>
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(activity.activityStatus)}`}>
+                                        {activity.activityStatus === 'NOT_STARTED' && '시작 전'}
+                                        {activity.activityStatus === 'STARTED' && '진행 중'}
+                                        {activity.activityStatus === 'ENDED' && '종료'}
+                                    </span>
+                                </div>
+                                <div className="space-y-1 text-sm text-gray-600">
+                                    <div className="flex items-center">
+                                        <i className="ri-group-line mr-2"></i>
+                                        <span>
+                                            멤버: {activity.participantCount}/{activity.maxParticipants}명
+                                        </span>
                                     </div>
-                                    <div className="space-y-1 text-sm text-gray-600">
-                                        <div className="flex items-center">
-                                            <i className="ri-group-line mr-2"></i>
-                                            <span>
-                      멤버: {activity.participantCount}/{activity.maxParticipants}명
-                    </span>
-                                        </div>
-                                        <div className="flex items-center">
-                                            <i className="ri-calendar-line mr-2"></i>
-                                            <span>{formatSchedule(activity.recurringSchedules, activity.eventSchedules)}</span>
-                                        </div>
-                                        <div className="flex items-center">
-                                            <i className="ri-map-pin-line mr-2"></i>
-                                            <span>{activity.location}</span>
-                                        </div>
-                                        <div className="flex items-center">
-                                            <i className="ri-play-circle-line mr-2"></i>
-                                            <span>총 {activity.sessionCount}회 진행</span>
-                                        </div>
+                                    <div className="flex items-center">
+                                        <i className="ri-calendar-line mr-2"></i>
+                                        <span>{formatSchedule(activity.recurringSchedules, activity.eventSchedules)}</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <i className="ri-map-pin-line mr-2"></i>
+                                        <span>{activity.location}</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <i className="ri-play-circle-line mr-2"></i>
+                                        <span>총 {activity.sessionCount}회 진행</span>
                                     </div>
                                 </div>
                             </div>
-
-                            {/* 액션 버튼 */}
-                            <div className="flex flex-col space-y-2">
-                                <button
-                                    onClick={() => {
-                                        if (attendanceOpen[activity.id]) {
-                                            setSelectedActivity(activity);
-                                            setShowAttendanceModal(true);
-                                        } else {
-                                            handleOpenAttendance(activity);
-                                        }
-                                    }}
-                                    className={`w-full py-2 rounded-lg text-sm font-medium transition-colors ${attendanceOpen[activity.id]
-                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                                    }`}
-                                >
-                                    {attendanceOpen[activity.id] ? '출석 진행 중' : '출석 오픈'}
-                                </button>
-                                {activity.activityStatus === 'STARTED' && (
-                                    <button
-                                        onClick={() => handleAttendanceManagement(activity)}
-                                        className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium"
-                                    >
-                                        출석 관리
-                                    </button>
-                                )}
-                            </div>
                         </div>
-                    ))
-            )}
+
+                        {/* 액션 버튼 */}
+                        <div className="flex flex-col space-y-2">
+                            <button
+                                onClick={() => {
+                                    if (attendanceOpen[activity.id]) {
+                                        setSelectedActivity(activity);
+                                        setShowAttendanceModal(true);
+                                    } else {
+                                        handleOpenAttendance(activity);
+                                    }
+                                }}
+                                className={`w-full py-2 rounded-lg text-sm font-medium transition-colors ${attendanceOpen[activity.id]
+                                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                                    }`}
+                            >
+                                {attendanceOpen[activity.id] ? '출석 진행 중' : '출석 오픈'}
+                            </button>
+                            {activity.activityStatus === 'STARTED' && (
+                                <button
+                                    onClick={() => handleAttendanceManagement(activity)}
+                                    className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium"
+                                >
+                                    출석 관리
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                ));
+            })()}
 
             {/* 출석 코드 모달 */}
             {showAttendanceModal && selectedActivity && (
