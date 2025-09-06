@@ -48,6 +48,7 @@ export default function Attendance() {
           setAvailableAttendance(sessions);
         } catch (error) {
           console.error('출석 가능한 활동을 불러오는 중 오류가 발생했습니다.', error);
+          navigate("/login")
         }
       };
 

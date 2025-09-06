@@ -124,6 +124,7 @@ export default function MyPage() {
 
       } catch (error) {
         console.error('마이페이지 데이터 로딩 실패:', error);
+        navigate("/login")
       } finally {
         setIsLoading(false);
       }
