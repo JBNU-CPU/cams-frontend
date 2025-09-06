@@ -27,6 +27,10 @@ export default function ActivityManagement() {
     const [reopenAttendanceCode, setReopenAttendanceCode] = useState(''); // New state
     const [reopenClosableMinutes, setReopenClosableMinutes] = useState(''); // New state
     const [lastClosedSession, setLastClosedSession] = useState({}); // New state
+    const [selectedMemberForSessionDetails, setSelectedMemberForSessionDetails] = useState(null);
+    const [memberSessionAttendanceDetails, setMemberSessionAttendanceDetails] = useState([]);
+    const [currentAttendanceModalView, setCurrentAttendanceModalView] = useState('overview'); // New state
+    const [previousModal, setPreviousModal] = useState(null);
 
     // 수정할 활동 정보 상태
     const [editForm, setEditForm] = useState({
@@ -601,6 +605,45 @@ export default function ActivityManagement() {
         }));
     };
 
+    const handleViewMemberSessionDetails = async (member) => {
+        setSelectedMemberForSessionDetails(member);
+        if (showAttendanceStatsModal) {
+            setShowAttendanceStatsModal(false);
+            setPreviousModal('attendanceStats');
+        } else if (showCurrentAttendance) {
+            setPreviousModal('currentAttendance');
+        }
+        if (!showCurrentAttendance) {
+            setShowCurrentAttendance(true);
+        }
+        setCurrentAttendanceModalView('memberDetails');
+        console.log('Fetching session details for member:', member);
+        console.log('Selected Activity ID:', selectedActivity.id);
+        console.log('Member ID:', member.id);
+        try {
+            // Assuming an API endpoint like /api/attendance/activity/{activityId}/member/{memberId}
+            const response = await axiosInstance.get(`/api/attendance/activity/${selectedActivity.id}/member/${member.id}`);
+            setMemberSessionAttendanceDetails(response.data);
+        } catch (error) {
+            console.error('Error fetching member session attendance details:', error);
+            setMemberSessionAttendanceDetails([]);
+        }
+    };
+
+    const handleUpdateMemberSessionAttendance = async (attendanceId, newStatus) => {
+        try {
+            await axiosInstance.patch(`/api/attendance/${attendanceId}`, { status: newStatus });
+            // After successful update, refresh the details for the current member
+            // This assumes selectedMemberForSessionDetails and selectedActivity are still set
+            const response = await axiosInstance.get(`/api/attendance/activity/${selectedActivity.id}/member/${selectedMemberForSessionDetails.id}`);
+            setMemberSessionAttendanceDetails(response.data);
+            alert('출결 정보가 업데이트되었습니다.');
+        } catch (error) {
+            console.error('Error updating member session attendance:', error);
+            alert('출결 정보 업데이트에 실패했습니다.');
+        }
+    };
+
     return (
         <div className="space-y-4">
             {(() => {
@@ -838,6 +881,7 @@ export default function ActivityManagement() {
                                         onClick={() => {
                                             setShowAttendanceModal(false);
                                             setShowCurrentAttendance(true);
+                                            setCurrentAttendanceModalView('overview');
                                         }}
                                         className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium"
                                     >
@@ -912,135 +956,232 @@ export default function ActivityManagement() {
             {showCurrentAttendance && selectedActivity && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
                     <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
-                        <div className="px-6 py-4 border-b border-gray-100">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="text-lg font-semibold text-gray-900">출석 현황</h3>
-                                    <p className="text-sm text-gray-600 mt-1">{selectedActivity?.title}</p>
-                                </div>
-                                <button
-                                    onClick={() => setShowCurrentAttendance(false)}
-                                    className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
-                                >
-                                    <i className="ri-close-line text-gray-600"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto">
-                            <div className="p-6 space-y-6">
-                                
-
-                                <div>
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center space-x-2">
-                                            <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
-                                                <i className="ri-check-line text-green-600 text-sm"></i>
-                                            </div>
-                                            <h4 className="font-medium text-gray-900">출석 완료</h4>
+                        {currentAttendanceModalView === 'overview' ? (
+                            <>
+                                <div className="px-6 py-4 border-b border-gray-100">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-lg font-semibold text-gray-900">현재 출석 현황</h3>
+                                            <p className="text-sm text-gray-600 mt-1">{selectedActivity?.title}</p>
                                         </div>
-                                        <span className="text-sm text-gray-500">{attendedMembers.length}명</span>
+                                        <button
+                                            onClick={() => {
+                                                setShowCurrentAttendance(false);
+                                                setCurrentAttendanceModalView('overview'); // Reset view
+                                            }}
+                                            className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
+                                        >
+                                            <i className="ri-close-line text-gray-600"></i>
+                                        </button>
                                     </div>
-
-                                    {attendedMembers.length === 0 ? (
-                                        <div className="bg-gray-50 rounded-xl p-8 text-center">
-                                            <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-3">
-                                                <i className="ri-user-line text-gray-400 text-xl"></i>
-                                            </div>
-                                            <p className="text-gray-500 text-sm">아직 출석한 멤버가 없습니다</p>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {attendedMembers.map((member) => (
-                                                <div key={member.id} className="bg-gray-50 rounded-xl p-4 hover-gray-100 transition-colors">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center space-x-3">
-                                                            <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
-                                                                <span className="text-sm font-semibold text-blue-700">{member.name.charAt(0)}</span>
-                                                            </div>
-                                                            <div>
-                                                                <div className="font-medium text-gray-900">{member.name}</div>
-                                                                <div className="text-xs text-gray-500">
-                                                                    {member.department}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <div className="text-sm text-gray-600 mb-1">{member.attendanceTime}</div>
-                                                            <span
-                                                                className={`px-2 py-1 rounded-full text-xs font-medium ${getAttendanceStatusColor(
-                                                                    member.status
-                                                                )}`}
-                                                            >
-                                {member.status}
-                              </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
                                 </div>
 
-                                <div>
-                                    {(() => {
-                                        return (
-                                            <>
-                                                <div className="flex items-center justify-between mb-4">
-                                                    <div className="flex items-center space-x-2">
-                                                        <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center">
-                                                            <i className="ri-close-line text-red-600 text-sm"></i>
-                                                        </div>
-                                                        <h4 className="font-medium text-gray-900">미출석</h4>
-                                                    </div>
-                                                    <span className="text-sm text-gray-500">{nonPresentMembers.length}명</span>
-                                                </div>
+                                <div className="flex-1 overflow-y-auto">
+                                    <div className="p-6 space-y-6">
+                                        
 
-                                                {nonPresentMembers.length === 0 ? (
-                                                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 text-center">
-                                                        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                                            <i className="ri-check-line text-green-600 text-xl"></i>
-                                                        </div>
-                                                        <p className="text-green-700 font-medium mb-1">완벽한 출석!</p>
-                                                        <p className="text-green-600 text-sm">모든 멤버가 출석했습니다</p>
+                                        <div>
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="flex items-center space-x-2">
+                                                    <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                                                        <i className="ri-check-line text-green-600 text-sm"></i>
                                                     </div>
-                                                ) : (
-                                                    <div className="space-y-2">
-                                                        {nonPresentMembers.map((member) => (
-                                                            <div key={member.id} className="bg-red-50 rounded-lg p-3 border border-red-100">
-                                                                <div className="flex items-center justify-between">
-                                                                    <div className="flex items-center space-x-3">
-                                                                        <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                                                                            <span className="text-xs font-semibold text-red-700">{member.name.charAt(0)}</span>
-                                                                        </div>
-                                                                        <div>
-                                                                            <div className="font-medium text-gray-900">{member.name}</div>
-                                                                            <div className="text-xs text-gray-500">
-                                                                                {member.department}
-                                                                            </div>
+                                                    <h4 className="font-medium text-gray-900">출석 완료</h4>
+                                                </div>
+                                                <span className="text-sm text-gray-500">{attendedMembers.length}명</span>
+                                            </div>
+
+                                            {attendedMembers.length === 0 ? (
+                                                <div className="bg-gray-50 rounded-xl p-8 text-center">
+                                                    <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                        <i className="ri-user-line text-gray-400 text-xl"></i>
+                                                    </div>
+                                                    <p className="text-gray-500 text-sm">아직 출석한 멤버가 없습니다</p>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    {attendedMembers.map((member) => (
+                                                        <div key={member.id} className="bg-gray-50 rounded-xl p-4 hover-gray-100 transition-colors">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center space-x-3">
+                                                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
+                                                                        <span className="text-sm font-semibold text-blue-700">{member.name.charAt(0)}</span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="font-medium text-gray-900">{member.name}</div>
+                                                                        <div className="text-xs text-gray-500">
+                                                                            {member.department}
                                                                         </div>
                                                                     </div>
-                                                                    <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">{member.status}</span>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <div className="text-sm text-gray-600 mb-1">{member.attendanceTime}</div>
+                                                                    <span
+                                                                        className={`px-2 py-1 rounded-full text-xs font-medium ${getAttendanceStatusColor(
+                                                                            member.status
+                                                                        )}`}
+                                                                    >
+                                        {member.status}
+                                      </span>
+                                                                    
                                                                 </div>
                                                             </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </>
-                                        );
-                                    })()}
-                                </div>
-                            </div>
-                        </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
 
-                        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
-                            <button
-                                onClick={() => setShowCurrentAttendance(false)}
-                                className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
-                            >
-                                확인
-                            </button>
-                        </div>
+                                        <div>
+                                            {(() => {
+                                                return (
+                                                    <>
+                                                        <div className="flex items-center justify-between mb-4">
+                                                            <div className="flex items-center space-x-2">
+                                                                <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center">
+                                                                    <i className="ri-close-line text-red-600 text-sm"></i>
+                                                                </div>
+                                                                <h4 className="font-medium text-gray-900">미출석</h4>
+                                                            </div>
+                                                            <span className="text-sm text-gray-500">{nonPresentMembers.length}명</span>
+                                                        </div>
+
+                                                        {nonPresentMembers.length === 0 ? (
+                                                            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 text-center">
+                                                                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                                    <i className="ri-check-line text-green-600 text-xl"></i>
+                                                                </div>
+                                                                <p className="text-green-700 font-medium mb-1">완벽한 출석!</p>
+                                                                <p className="text-green-600 text-sm">모든 멤버가 출석했습니다</p>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-2">
+                                                                {nonPresentMembers.map((member) => (
+                                                                    <div key={member.id} className="bg-red-50 rounded-lg p-3 border border-red-100">
+                                                                        <div className="flex items-center justify-between">
+                                                                            <div className="flex items-center space-x-3">
+                                                                                <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                                                                                    <span className="text-xs font-semibold text-red-700">{member.name.charAt(0)}</span>
+                                                                                </div>
+                                                                                <div>
+                                                                                    <div className="font-medium text-gray-900">{member.name}</div>
+                                                                                    <div className="text-xs text-gray-500">
+                                                                                        {member.department}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                            <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">{member.status}</span>
+                                                                            
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                );
+                                            })()}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+                                    <button
+                                        onClick={() => {
+                                            setShowCurrentAttendance(false);
+                                            setCurrentAttendanceModalView('overview'); // Reset view
+                                        }}
+                                        className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
+                                    >
+                                        확인
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="px-6 py-4 border-b border-gray-100">
+                                    <div className="flex items-center justify-between">
+                                        <button
+                                            onClick={() => {
+                                                if (previousModal === 'attendanceStats') {
+                                                    setShowCurrentAttendance(false);
+                                                    setShowAttendanceStatsModal(true);
+                                                } else {
+                                                    setCurrentAttendanceModalView('overview');
+                                                }
+                                                setPreviousModal(null); // Clear previous modal state
+                                            }}
+                                            className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
+                                        >
+                                            <i className="ri-arrow-left-line text-gray-600"></i>
+                                        </button>
+                                        <div className="flex-1 text-center">
+                                            <h3 className="text-lg font-semibold text-gray-900">{selectedMemberForSessionDetails?.name}님의 출결 상세</h3>
+                                            <p className="text-sm text-gray-600">{selectedActivity?.title}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                setShowCurrentAttendance(false);
+                                                setCurrentAttendanceModalView('overview'); // Reset view
+                                            }}
+                                            className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
+                                        >
+                                            <i className="ri-close-line text-gray-600"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto p-6">
+                                    <div className="space-y-4 mb-6">
+                                        {memberSessionAttendanceDetails.length === 0 ? (
+                                            <div className="bg-gray-50 rounded-xl p-4 text-center text-gray-500 text-sm">
+                                                세션별 출결 정보가 없습니다.
+                                            </div>
+                                        ) : (
+                                            memberSessionAttendanceDetails.map((sessionDetail) => (
+                                                <div key={sessionDetail.sessionId} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <span className="font-medium text-gray-900">{sessionDetail.sessionNumber}회차</span>
+                                                        <span className="text-sm text-gray-600">{new Date(sessionDetail.attendanceTime).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+                                                    </div>
+                                                    <div className="flex items-center space-x-2">
+                                                        <label htmlFor={`status-${sessionDetail.sessionId}`} className="text-sm text-gray-700">상태:</label>
+                                                        <select
+                                                            id={`status-${sessionDetail.sessionId}`}
+                                                            value={sessionDetail.attendanceStatus}
+                                                            onChange={(e) => handleUpdateMemberSessionAttendance(sessionDetail.attendanceId, e.target.value)}
+                                                            className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                        >
+                                                            <option value="PRESENT">출석</option>
+                                                            <option value="LATE">지각</option>
+                                                            <option value="ABSENT">결석</option>
+                                                            <option value="EXCUSED">대기중</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+                                    <button
+                                        onClick={() => {
+                                            if (previousModal === 'attendanceStats') {
+                                                setShowCurrentAttendance(false);
+                                                setShowAttendanceStatsModal(true);
+                                                setCurrentAttendanceModalView('overview'); // Reset view when closing showCurrentAttendance
+                                            } else {
+                                                setCurrentAttendanceModalView('overview');
+                                            }
+                                            setPreviousModal(null); // Clear previous modal state
+                                        }}
+                                        className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
+                                    >
+                                        닫기
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             )}
@@ -1268,20 +1409,19 @@ export default function ActivityManagement() {
                                         {weeklySummaries.map((summary, index) => (
                                             <div key={index} className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
                                                 <div className="flex justify-between items-center mb-2">
-                                                    <span className="font-medium text-gray-900 text-base">{summary.weekNumber}주차</span>
-                                                    <span className="text-sm text-gray-500">{summary.date}</span>
+                                                    <span className="font-medium text-gray-900 text-base">{summary.sessionNumber}회차</span>
                                                 </div>
                                                 <div className="grid grid-cols-3 gap-3 text-center mt-3">
                                                     <div className="bg-green-50 rounded-lg p-3">
-                                                        <div className="text-lg font-bold text-green-700">{summary.attendedCount}</div>
+                                                        <div className="text-lg font-bold text-green-700">{summary.attendedCount ?? 0}</div>
                                                         <div className="text-xs text-gray-600">출석</div>
                                                     </div>
                                                     <div className="bg-yellow-50 rounded-lg p-3">
-                                                        <div className="text-lg font-bold text-yellow-700">{summary.lateCount}</div>
+                                                        <div className="text-lg font-bold text-yellow-700">{summary.lateCount ?? 0}</div>
                                                         <div className="text-xs text-gray-600">지각</div>
                                                     </div>
                                                     <div className="bg-red-50 rounded-lg p-3">
-                                                        <div className="text-lg font-bold text-red-700">{summary.absentCount}</div>
+                                                        <div className="text-lg font-bold text-red-700">{summary.absentCount ?? 0}</div>
                                                         <div className="text-xs text-gray-600">결석</div>
                                                     </div>
                                                 </div>
@@ -1308,18 +1448,24 @@ export default function ActivityManagement() {
                                                 </div>
                                                 <div className="grid grid-cols-3 gap-3 text-center mt-3">
                                                     <div className="bg-green-50 rounded-lg p-3">
-                                                        <div className="text-lg font-bold text-green-700">{member.attendedCount}</div>
+                                                        <div className="text-lg font-bold text-green-700">{member.attendedCount ?? 0}</div>
                                                         <div className="text-xs text-gray-600">출석</div>
                                                     </div>
                                                     <div className="bg-yellow-50 rounded-lg p-3">
-                                                        <div className="text-lg font-bold text-yellow-700">{member.lateCount}</div>
+                                                        <div className="text-lg font-bold text-yellow-700">{member.lateCount ?? 0}</div>
                                                         <div className="text-xs text-gray-600">지각</div>
                                                     </div>
                                                     <div className="bg-red-50 rounded-lg p-3">
-                                                        <div className="text-lg font-bold text-red-700">{member.absentCount}</div>
+                                                        <div className="text-lg font-bold text-red-700">{member.absentCount ?? 0}</div>
                                                         <div className="text-xs text-gray-600">결석</div>
                                                     </div>
                                                 </div>
+                                                <button
+                                                    onClick={() => handleViewMemberSessionDetails({ ...member, id: member.memberId || member.id })}
+                                                    className="ml-2 px-2 py-1 text-xs bg-gray-100 rounded-full hover:bg-gray-200"
+                                                >
+                                                    더보기
+                                                </button>
                                             </div>
                                         ))}
                                     </div>
@@ -1335,6 +1481,8 @@ export default function ActivityManagement() {
                     </div>
                 </div>
             )}
+
+            
         </div>
     );
 }
