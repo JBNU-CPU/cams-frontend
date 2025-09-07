@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { login } from '../../store/authSlice';
+import Alert from '../../components/common/Alert';
 
 export default function LoginPage() {
     const [studentId, setStudentId] = useState('');
     const [password, setPassword] = useState('');
+    const [alertMessage, setAlertMessage] = useState(null);
 
     const dispatch = useDispatch();
     const navigate = useNavigate();
@@ -16,8 +18,10 @@ export default function LoginPage() {
     // isLoggedIn 상태가 true로 바뀌면 홈으로 이동합니다.
     useEffect(() => {
         if (isLoggedIn) {
-            alert('로그인에 성공했습니다!');
-            navigate('/home'); // 로그인 성공 후 홈으로 이동
+            setAlertMessage('로그인에 성공했습니다!'); // ✅ 알림 메시지 띄우기
+            setTimeout(() => {
+                navigate('/home');
+            }, 500); // 0.5초 뒤 홈으로 이동
         }
     }, [isLoggedIn, navigate]);
 
@@ -34,6 +38,9 @@ export default function LoginPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center px-4">
+            {alertMessage && (
+                <Alert message={alertMessage} onClose={() => setAlertMessage(null)} />
+            )}
             <div className="max-w-md w-full mx-auto">
                 <div className="text-center mb-8">
                     <img

@@ -1,54 +1,68 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { logout } from '../../store/authSlice';
 import { useDispatch } from 'react-redux';
+import Alert from './Alert';
+import ConfirmDialog from './ConfirmDialog';
+
 
 export default function Header({ title, unreadCount, isLoggedIn, onNotificationClick, children }) {
     const navigate = useNavigate();
     const dispatch = useDispatch();
 
-    const handleLogout = async () => {
-        if (confirm('로그아웃 하시겠습니까?')) {
-            // 실제 앱에서는 토큰 삭제 등 로그아웃 처리
-            await dispatch(logout()).unwrap();
+    const [alertMessage, setAlertMessage] = useState(null);
+    const [showConfirm, setShowConfirm] = useState(false);
 
-            alert('로그아웃되었습니다.');
-            navigate('/login'); // 로그아웃 후 로그인 페이지로 이동
+    const handleLogout = async () => {
+        setShowConfirm(true); // ✅ confirm 모달 열기
+    };
+
+    const confirmLogout = async () => {
+        setShowConfirm(false);
+        try {
+            await dispatch(logout()).unwrap();
+            setAlertMessage('로그아웃되었습니다.'); // ✅ Alert 띄우기
+            setTimeout(() => {
+                navigate('/login');
+            }, 500);
+        } catch (error) {
+            setAlertMessage('로그아웃 중 오류가 발생했습니다.');
+            setTimeout(() => {
+                navigate('/login');
+            }, 500);
         }
     };
 
+    const cancelLogout = () => {
+        setShowConfirm(false);
+    };
+
     const handleLogin = () => {
-        console.error('Logout failed:', error);
-        alert('로그아웃 중 오류가 발생했습니다.');
         navigate('/login');
     };
 
     return (
         <div className="bg-white border-b border-gray-100 sticky top-0 z-40">
+            {/* ✅ Alert */}
+            {alertMessage && (
+                <Alert message={alertMessage} onClose={() => setAlertMessage(null)} />
+            )}
+
+            {/* ✅ ConfirmDialog */}
+            {showConfirm && (
+                <ConfirmDialog
+                    message="로그아웃 하시겠습니까?"
+                    onConfirm={confirmLogout}
+                    onCancel={cancelLogout}
+                />
+            )}
+
             <div className="px-4 py-4">
-                {/* 제목을 중앙에 배치하기 위해 컨테이너를 relative로 설정 */}
                 <div className="relative flex items-center justify-between h-10">
-
-                    {/* 왼쪽 영역: 뒤로가기 버튼 등이 위치할 수 있는 공간 확보 */}
                     <div className="w-10"></div>
-
-                    {/* 중앙 제목: absolute 포지셔닝으로 완벽한 중앙 정렬 */}
                     <h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-bold text-gray-900 whitespace-nowrap">
                         {title}
                     </h1>
-
-                    {/* 오른쪽 버튼 영역 */}
                     <div className="flex items-center space-x-2">
-                        {/* <button
-                            onClick={onNotificationClick}
-                            className="relative w-10 h-10 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
-                        >
-                            <i className="ri-notification-line text-gray-600"></i>
-                            {isLoggedIn && unreadCount > 0 && (
-                                <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-medium rounded-full flex items-center justify-center">
-                                    {unreadCount > 9 ? '9+' : unreadCount}
-                                </div>
-                            )}
-                        </button> */}
                         {isLoggedIn ? (
                             <button
                                 onClick={handleLogout}
@@ -75,4 +89,3 @@ export default function Header({ title, unreadCount, isLoggedIn, onNotificationC
         </div>
     );
 }
-

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axiosInstance from '../../api/axiosInstance';
+import Alert from '../../components/common/Alert';
 
 export default function ActivityDetail() {
   const { id } = useParams();
@@ -15,6 +16,9 @@ export default function ActivityDetail() {
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
 
+  // 알림 상태
+  const [alertMessage, setAlertMessage] = useState(null);
+
   // 헬퍼 함수: API 데이터를 프론트엔드 상태에 맞게 변환
   const mapApiDataToState = (apiActivity) => {
     const categoryMap = { SESSION: '세션', STUDY: '스터디', PROJECT: '프로젝트', MEETING: '소모임', GENERAL: '행사' };
@@ -28,6 +32,7 @@ export default function ActivityDetail() {
       id: apiActivity.id,
       title: apiActivity.title,
       leader: apiActivity.createdBy,
+      leaderId: apiActivity.creatorId,
       currentMembers: apiActivity.participantCount,
       maxMembers: apiActivity.maxParticipants,
       schedule: scheduleText,
@@ -82,12 +87,12 @@ export default function ActivityDetail() {
     try {
       await axiosInstance.post(`/api/activities/${id}/participant`);
       setShowApplyModal(false);
-      alert('활동 신청이 완료되었습니다!');
-      setIsApplied(true);
+      setAlertMessage('활동 신청이 완료되었습니다!'); // 알림
       setActivity(prev => ({ ...prev, currentMembers: prev.currentMembers + 1 }));
+      navigate("/")
     } catch (error) {
       setShowApplyModal(false);
-      alert(error.response?.data?.message || '활동 신청에 실패했습니다.');
+      setAlertMessage(error.response?.data?.message || '활동 신청에 실패했습니다.');
     }
   };
 
@@ -96,12 +101,12 @@ export default function ActivityDetail() {
     try {
       await axiosInstance.delete(`/api/activities/${id}/participant`);
       setShowCancelModal(false);
-      alert('활동 신청이 취소되었습니다.');
+      setAlertMessage('활동 신청이 취소되었습니다.');
       setIsApplied(false);
       setActivity(prev => ({ ...prev, currentMembers: prev.currentMembers - 1 }));
     } catch (error) {
       setShowCancelModal(false);
-      alert(error.response?.data?.message || '신청 취소에 실패했습니다.');
+      setAlertMessage(error.response?.data?.message || '신청 취소에 실패했습니다.');
     }
   };
 
@@ -110,7 +115,8 @@ export default function ActivityDetail() {
   if (activity === null) return (<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="text-center"><i className="ri-loader-4-line text-3xl text-gray-400 animate-spin mb-4"></i><p className="text-gray-500">활동을 불러오는 중...</p></div></div>);
   if (activity === undefined) return (<div className="min-h-screen flex flex-col items-center justify-center bg-gray-50"><h2 className="text-xl font-semibold text-gray-800">활동을 찾을 수 없습니다.</h2><button onClick={() => navigate('/')} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg">홈으로 돌아가기</button></div>);
 
-  const isOwner = currentUser && activity && currentUser.name === activity.leader;
+  // const isOwner = currentUser && activity && currentUser.name === activity.leader;
+  const isOwner = currentUser && activity && currentUser.id === activity.leaderId;
 
   const getCategoryColor = (category) => ({ '세션': 'bg-blue-100 text-blue-700', '스터디': 'bg-green-100 text-green-700', '프로젝트': 'bg-purple-100 text-purple-700', '소모임': 'bg-orange-100 text-orange-700', '행사': 'bg-red-100 text-red-700' }[category] || 'bg-gray-100 text-gray-700');
   const getStatusColor = (status) => ({ '모집 중': 'bg-green-100 text-green-700', '진행 중': 'bg-blue-100 text-blue-700', '마감': 'bg-red-100 text-red-700' }[status] || 'bg-gray-100 text-gray-700');
@@ -119,7 +125,9 @@ export default function ActivityDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
+      {alertMessage && (
+        <Alert message={alertMessage} onClose={() => setAlertMessage(null)} />
+      )}      <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
         <div className="flex items-center justify-between px-4 py-4">
           <button onClick={() => navigate(-1)} className="w-8 h-8 flex items-center justify-center"><i className="ri-arrow-left-line text-xl text-gray-700"></i></button>
           <h1 className="text-lg font-semibold text-gray-900 truncate px-2">{activity.title}</h1>
