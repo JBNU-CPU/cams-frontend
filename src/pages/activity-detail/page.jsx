@@ -113,7 +113,7 @@ export default function ActivityDetail() {
   const handleEdit = () => navigate(`/create-activity`, { state: { activityData: activity.rawData } });
 
   if (activity === null) return (<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="text-center"><i className="ri-loader-4-line text-3xl text-gray-400 animate-spin mb-4"></i><p className="text-gray-500">활동을 불러오는 중...</p></div></div>);
-  if (activity === undefined) return (<div className="min-h-screen flex flex-col items-center justify-center bg-gray-50"><h2 className="text-xl font-semibold text-gray-800">활동을 찾을 수 없습니다.</h2><button onClick={() => navigate('/')} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg">홈으로 돌아가기</button></div>);
+  if (activity === undefined) return (<div className="min-h-screen flex flex-col items-center justify-center bg-gray-50"><h2 className="text-xl font-semibold text-gray-800">활동을 찾을 수 없습니다.</h2><button onClick={() => navigate('/home')} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg">홈으로 돌아가기</button></div>);
 
   // const isOwner = currentUser && activity && currentUser.name === activity.leader;
   const isOwner = currentUser && activity && currentUser.id === activity.leaderId;
