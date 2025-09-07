@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axiosInstance from '../../api/axiosInstance';
+import Alert from '../../components/common/Alert';
 
 export default function SignupPage() {
   const navigate = useNavigate();
@@ -9,6 +10,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [alertMessage, setAlertMessage] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,16 +41,19 @@ export default function SignupPage() {
 
     try {
       await axiosInstance.post('/api/member', requestBody);
-      alert('프로필이 성공적으로 저장되었습니다.');
-      navigate('/');
+      setAlertMessage('프로필이 성공적으로 저장되었습니다.');
+      setTimeout(() => navigate('/'), 500);
     } catch (error) {
       console.error('프로필 업데이트 실패:', error);
-      alert('프로필 저장에 실패했습니다. 다시 시도해주세요.');
+      setAlertMessage('프로필이 성공적으로 저장되었습니다.');
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center px-4 py-12">
+      {alertMessage && (
+        <Alert message={alertMessage} onClose={() => setAlertMessage(null)} />
+      )}
       <div className="max-w-md w-full mx-auto">
 
         {/* 로고 또는 앱 이름 */}

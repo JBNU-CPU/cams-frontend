@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axiosInstance from '../../api/axiosInstance';
+import Alert from '../../components/common/Alert';
 
 export default function CreateActivity() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [alertMessage, setAlertMessage] = useState(null);
 
   const [isEditing, setIsEditing] = useState(false);
   const [activityId, setActivityId] = useState(null);
@@ -190,7 +192,7 @@ export default function CreateActivity() {
     e.preventDefault();
 
     if (!basicValid) {
-      alert('필수 항목을 모두 입력해주세요.');
+      setAlertMessage('필수 항목을 모두 입력해주세요.');
       return;
     }
     if (!validateSchedules()) return;
@@ -247,12 +249,13 @@ export default function CreateActivity() {
     try {
       if (isEditing) {
         await axiosInstance.put(`/api/activities/${activityId}`, payload);
-        alert('활동이 성공적으로 수정되었습니다!');
-        navigate(`/activity/${activityId}`, { replace: true });
+        setAlertMessage('활동이 성공적으로 수정되었습니다!');
+        setTimeout(() => navigate(`/activity/${activityId}`, { replace: true }), 500);
+
       } else {
         await axiosInstance.post('/api/activities', payload);
-        alert('활동이 성공적으로 개설되었습니다!');
-        navigate('/my', { replace: true });
+        setAlertMessage('활동이 성공적으로 개설되었습니다!');
+        setTimeout(() => navigate('/my', { replace: true }, { replace: true }), 500);
       }
     } catch (error) {
       console.error(`활동 ${isEditing ? '수정' : '개설'} 실패:`, error);
@@ -262,6 +265,9 @@ export default function CreateActivity() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-6">
+      {alertMessage && (
+        <Alert message={alertMessage} onClose={() => setAlertMessage(null)} />
+      )}
       <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
         <div className="px-4 py-4 flex items-center space-x-3">
           <button
@@ -312,8 +318,8 @@ export default function CreateActivity() {
                     type="button"
                     onClick={() => setFormData({ ...formData, activityType: type })}
                     className={`py-3 px-4 rounded-lg text-sm font-medium border ${formData.activityType === type
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-gray-50 text-gray-700 border-gray-200'
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-gray-50 text-gray-700 border-gray-200'
                       }`}
                   >
                     {type}
@@ -443,8 +449,8 @@ export default function CreateActivity() {
                               type="button"
                               onClick={() => handleDayToggle(schedule.id, day)}
                               className={`py-2 px-3 rounded-lg text-sm font-medium border ${schedule.days.includes(day)
-                                  ? 'bg-blue-600 text-white border-blue-600'
-                                  : 'bg-white text-gray-700 border-gray-200'
+                                ? 'bg-blue-600 text-white border-blue-600'
+                                : 'bg-white text-gray-700 border-gray-200'
                                 }`}
                             >
                               {day}

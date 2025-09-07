@@ -1,5 +1,6 @@
-import {useEffect, useState} from 'react';
+import { useEffect, useState } from 'react';
 import axiosInstance from '@/api/axiosInstance';
+import Alert from '../../../components/common/Alert';
 
 export default function ActivityManagement() {
     const [showAttendanceModal, setShowAttendanceModal] = useState(false);
@@ -31,7 +32,7 @@ export default function ActivityManagement() {
     const [memberSessionAttendanceDetails, setMemberSessionAttendanceDetails] = useState([]);
     const [currentAttendanceModalView, setCurrentAttendanceModalView] = useState('overview'); // New state
     const [previousModal, setPreviousModal] = useState(null);
-
+    const [alertMessage, setAlertMessage] = useState(null);
     // 수정할 활동 정보 상태
     const [editForm, setEditForm] = useState({
         title: '',
@@ -244,7 +245,7 @@ export default function ActivityManagement() {
     const handleStartAttendance = async () => {
         const finalTime = customTime ? parseInt(customTime) : attendanceTime;
         if (finalTime < 1 || finalTime > 120) {
-            alert('출석 시간은 1분에서 120분 사이로 설정해주세요.');
+            setAlertMessage('출석 시간은 1분에서 120분 사이로 설정해주세요.');
             return;
         }
 
@@ -275,7 +276,7 @@ export default function ActivityManagement() {
 
         } catch (error) {
             console.error('Error starting attendance session:', error);
-            alert('출석 세션 시작에 실패했습니다. 다시 시도해주세요.');
+            setAlertMessage('출석 세션 시작에 실패했습니다. 다시 시도해주세요.');
         }
     };
 
@@ -284,7 +285,7 @@ export default function ActivityManagement() {
             const session = currentOngoingSession[activityId];
             if (!session || !session.sessionId) {
                 console.error('No ongoing session found for this activity or session ID is missing.');
-                alert('세션 정보를 찾을 수 없습니다.');
+                setAlertMessage('세션 정보를 찾을 수 없습니다.');
                 return;
             }
 
@@ -304,7 +305,8 @@ export default function ActivityManagement() {
             setCurrentSessionId(null); // Clear currentSessionId as well
         } catch (error) {
             console.error('Error closing attendance session:', error);
-            alert('출석 세션 마감에 실패했습니다. 다시 시도해주세요.');
+            setAlertMessage('출석 세션 마감에 실패했습니다. 다시 시도해주세요.');
+
         }
     };
 
@@ -324,7 +326,8 @@ export default function ActivityManagement() {
             setShowCodeChangeModal(false);
             setNewCode('');
         } else {
-            alert('4자리 숫자를 입력해주세요.');
+            setAlertMessage('4자리 숫자를 입력해주세요.');
+
         }
     };
 
@@ -395,22 +398,26 @@ export default function ActivityManagement() {
             setReopenClosableMinutes('30'); // Placeholder
             setShowReopenModal(true);
         } else {
-            alert('재오픈할 세션 정보를 찾을 수 없습니다.');
+            setAlertMessage('재오픈할 세션 정보를 찾을 수 없습니다.');
+
         }
     };
 
     const handleConfirmReopen = async () => {
         if (!reopenSessionData || !reopenSessionData.sessionId) {
-            alert('재오픈할 세션 정보가 유효하지 않습니다.');
+            setAlertMessage('재오픈할 세션 정보가 유효하지 않습니다.');
+
             return;
         }
         if (!reopenAttendanceCode.trim() || !reopenClosableMinutes.trim()) {
-            alert('출석 코드와 출석 가능 시간을 입력해주세요.');
+            setAlertMessage('출석 코드와 출석 가능 시간을 입력해주세요.');
+
             return;
         }
         const minutes = parseInt(reopenClosableMinutes);
         if (isNaN(minutes) || minutes < 1 || minutes > 120) {
-            alert('출석 시간은 1분에서 120분 사이로 설정해주세요.');
+            setAlertMessage('출석 시간은 1분에서 120분 사이로 설정해주세요.');
+
             return;
         }
 
@@ -436,7 +443,7 @@ export default function ActivityManagement() {
             setReopenClosableMinutes('');
         } catch (error) {
             console.error('Error re-opening session:', error);
-            alert('세션 재오픈에 실패했습니다. 다시 시도해주세요.');
+            setAlertMessage('세션 재오픈에 실패했습니다. 다시 시도해주세요.');
         }
     };
 
@@ -544,7 +551,7 @@ export default function ActivityManagement() {
 
     const handleSaveEdit = () => {
         if (!editForm.title.trim() || editForm.days.length === 0 || !editForm.time.trim() || !editForm.location.trim()) {
-            alert('모든 필드를 입력해주세요.');
+            setAlertMessage('모든 필드를 입력해주세요.');
             return;
         }
 
@@ -637,15 +644,19 @@ export default function ActivityManagement() {
             // This assumes selectedMemberForSessionDetails and selectedActivity are still set
             const response = await axiosInstance.get(`/api/attendance/activity/${selectedActivity.id}/member/${selectedMemberForSessionDetails.id}`);
             setMemberSessionAttendanceDetails(response.data);
-            alert('출결 정보가 업데이트되었습니다.');
+            setAlertMessage('출결 정보가 업데이트되었습니다.');
         } catch (error) {
             console.error('Error updating member session attendance:', error);
-            alert('출결 정보 업데이트에 실패했습니다.');
+            setAlertMessage('출결 정보 업데이트에 실패했습니다.');
+
         }
     };
 
     return (
         <div className="space-y-4">
+            {alertMessage && (
+                <Alert message={alertMessage} onClose={() => setAlertMessage(null)} />
+            )}
             {(() => {
                 const displayActivities = activityData.filter(activity => activity.isApproved && activity.activityStatus === 'STARTED');
                 if (displayActivities.length === 0) {
@@ -705,14 +716,13 @@ export default function ActivityManagement() {
                                         handleOpenAttendance(activity); // Open new attendance modal
                                     }
                                 }}
-                                className={`w-full py-2 rounded-lg text-sm font-medium transition-colors ${
-                                    activityButtonStatus[activity.id] === '출석 진행 중'
-                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                        : activityButtonStatus[activity.id] === '출석 마감 됨'
+                                className={`w-full py-2 rounded-lg text-sm font-medium transition-colors ${activityButtonStatus[activity.id] === '출석 진행 중'
+                                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                    : activityButtonStatus[activity.id] === '출석 마감 됨'
                                         ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' // Change color for re-open
                                         : 'bg-blue-600 text-white hover:bg-blue-700'
-                                }`}
-                                // Remove disabled attribute
+                                    }`}
+                            // Remove disabled attribute
                             >
                                 {activityButtonStatus[activity.id] || '출석 오픈'}
                             </button>
@@ -773,7 +783,7 @@ export default function ActivityManagement() {
                                                 className={`py-2 px-3 text-sm rounded-lg border transition-colors ${customTime === minutes.toString()
                                                     ? 'bg-blue-600 text-white border-blue-600'
                                                     : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                                                }`}
+                                                    }`}
                                             >
                                                 {minutes}분
                                             </button>
@@ -978,7 +988,7 @@ export default function ActivityManagement() {
 
                                 <div className="flex-1 overflow-y-auto">
                                     <div className="p-6 space-y-6">
-                                        
+
 
                                         <div>
                                             <div className="flex items-center justify-between mb-4">
@@ -1021,9 +1031,9 @@ export default function ActivityManagement() {
                                                                             member.status
                                                                         )}`}
                                                                     >
-                                        {member.status}
-                                      </span>
-                                                                    
+                                                                        {member.status}
+                                                                    </span>
+
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -1071,7 +1081,7 @@ export default function ActivityManagement() {
                                                                                 </div>
                                                                             </div>
                                                                             <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">{member.status}</span>
-                                                                            
+
                                                                         </div>
                                                                     </div>
                                                                 ))}
@@ -1309,7 +1319,7 @@ export default function ActivityManagement() {
                                             className={`py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${editForm.days.includes(day)
                                                 ? 'bg-blue-600 text-white border-blue-600'
                                                 : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                                            }`}
+                                                }`}
                                         >
                                             {day}
                                         </button>
@@ -1343,7 +1353,7 @@ export default function ActivityManagement() {
                                                 className={`py-2 px-3 text-sm rounded-lg border transition-colors ${editForm.time === time
                                                     ? 'bg-blue-600 text-white border-blue-600'
                                                     : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                                                }`}
+                                                    }`}
                                             >
                                                 {time}
                                             </button>
@@ -1482,7 +1492,7 @@ export default function ActivityManagement() {
                 </div>
             )}
 
-            
+
         </div>
     );
 }

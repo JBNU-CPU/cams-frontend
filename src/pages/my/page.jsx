@@ -114,7 +114,7 @@ export default function MyPage() {
           email: profileData.email || '-',
           phone: profileData.phone || '-',
           major: profileData.department || '학과 정보 없음',
-          grade: profileData.cohort ? `${profileData.cohort}기` : '기수 정보 없음',
+          grade: profileData.cohort ? `${profileData.cohort}기` : 0,
           introduction: profileData.introduce || "자기소개를 작성해주세요.",
           interests: interestsArray, // 프론트엔드 상태 이름은 interests 유지
         });

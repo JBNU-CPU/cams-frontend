@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Alert from '../../components/common/Alert';
 
 export default function OnboardingPage() {
     const navigate = useNavigate();
+    const [alertMessage, setAlertMessage] = useState(null);
 
     // 폼 데이터를 관리하는 상태
     const [formData, setFormData] = useState({
@@ -33,12 +35,15 @@ export default function OnboardingPage() {
         // 실제 온보딩 정보 저장 로직 (여기서는 시뮬레이션)
         console.log('온보딩 정보 저장:', formData);
 
-        alert('프로필 설정이 완료되었습니다! 활동을 시작해보세요.');
-        navigate('/home'); // 온보딩 완료 후 홈으로 이동
+        setAlertMessage('프로필 설정이 완료되었습니다! 활동을 시작해보세요.');
+        setTimeout(() => navigate('/home'), 500);
     };
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center px-4 py-12">
+            {alertMessage && (
+                <Alert message={alertMessage} onClose={() => setAlertMessage(null)} />
+            )}
             <div className="max-w-md w-full mx-auto">
 
                 <div className="text-center mb-8">

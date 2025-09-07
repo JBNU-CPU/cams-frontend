@@ -9,14 +9,15 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { getNotificationIcon, getNotificationColor } from '../../api/NotificationData';
 import axiosInstance from '../../api/axiosInstance';
 import CountdownTimer from './components/CountdownTimer';
+import Alert from '../../components/common/Alert';
 
 export default function Attendance() {
   const [activeTab, setActiveTab] = useState('attendance');
   const [showCodeInput, setShowCodeInput] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [attendanceCode, setAttendanceCode] = useState('');
-  const [showSuccess, setShowSuccess] = useState(false);
   const [attendanceError, setAttendanceError] = useState('');
+  const [alertMessage, setAlertMessage] = useState(null);
 
   const [isLoggedIn, setIsLoggedIn] = useState(true);
   const navigate = useNavigate();
@@ -48,13 +49,15 @@ export default function Attendance() {
           setAvailableAttendance(sessions);
         } catch (error) {
           console.error('출석 가능한 활동을 불러오는 중 오류가 발생했습니다.', error);
-          navigate("/login")
+          // 알림 후 이동이 자연스러우면 이렇게:
+          setAlertMessage('로그인이 필요한 서비스입니다.');
+          setTimeout(() => navigate('/login'), 500);
         }
       };
 
       fetchOpenSessions();
     }
-  }, [activeTab]);
+  }, [activeTab, navigate]);
 
   const handleAttendanceClick = (activity) => {
     setSelectedActivity(activity);
@@ -69,12 +72,15 @@ export default function Attendance() {
 
         setAvailableAttendance(prev => prev.filter(activity => activity.id !== selectedActivity.id));
         setShowCodeInput(false);
-        setShowSuccess(true);
         setAttendanceCode('');
-        setTimeout(() => {
-          setShowSuccess(false);
-          setSelectedActivity(null);
-        }, 2000);
+        setSelectedActivity(null);
+        setAlertMessage('출석이 완료되었습니다!');
+
+        // setShowSuccess(true);
+        // setTimeout(() => {
+        //   setShowSuccess(false);
+        //   setSelectedActivity(null);
+        // }, 2000);
       } catch (error) {
         if (error.response && error.response.status === 403) {
           setAttendanceError('출석 코드가 일치하지 않습니다.');
@@ -103,13 +109,18 @@ export default function Attendance() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
+
+      {alertMessage && (
+        <Alert message={alertMessage} onClose={() => setAlertMessage(null)} />
+      )}
+
       <Header
         title="출석"
         unreadCount={unreadCount}
         isLoggedIn={isLoggedIn}
         onNotificationClick={() => {
           if (!isLoggedIn) {
-            alert('로그인이 필요한 서비스입니다.');
+            setAlertMessage('로그인이 필요한 서비스입니다.');
             navigate('/login');
             return;
           }
@@ -230,7 +241,7 @@ export default function Attendance() {
               </button>
             </div>
             <div className="flex space-x-3">
-               <button
+              <button
                 onClick={() => {
                   setShowCodeInput(false);
                   setAttendanceCode('');
@@ -251,17 +262,7 @@ export default function Attendance() {
         </div>
       )}
 
-      {showSuccess && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-8 text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <i className="ri-check-line text-2xl text-green-600"></i>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">출석 완료!</h3>
-            <p className="text-gray-600">{selectedActivity?.title}</p>
-          </div>
-        </div>
-      )}
+
 
       {/* 3. MyPage와 동일한 알림 모달 JSX를 추가합니다. */}
       {showNotificationModal && (
