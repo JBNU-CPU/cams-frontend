@@ -5,6 +5,8 @@ import Header from '../../components/common/Header';
 import { useNotifications } from '../../hooks/useNotifications';
 import { getNotificationIcon, getNotificationColor } from '../../api/NotificationData';
 import axiosInstance from '../../api/axiosInstance';
+import Alert from '../../components/common/Alert';
+import Confirm from '../../components/common/ConfirmDialog';
 
 // --- 데이터 매핑을 위한 헬퍼 함수들 ---
 const formatRecurringSchedule = (schedules) => {
@@ -95,6 +97,29 @@ export default function MyPage() {
   const [myOpenedActivities, setMyOpenedActivities] = useState([]);
   const [myAppliedActivities, setMyAppliedActivities] = useState([]);
 
+  const [alertMessage, setAlertMessage] = useState(null);
+  const [confirmConfig, setConfirmConfig] = useState({
+    open: false,
+    message: '',
+    confirmText: '확인',
+    cancelText: '취소',
+    onConfirm: null,
+  });
+
+  // 공통 confirm 열기
+  const openConfirm = (message, onConfirm) => {
+    setConfirmConfig({
+      open: true,
+      message,
+      onConfirm,
+      confirmText: '확인',
+      cancelText: '취소',
+    });
+  };
+
+  const closeConfirm = () => setConfirmConfig(prev => ({ ...prev, open: false, onConfirm: null }));
+
+
   useEffect(() => {
     const fetchMyPageData = async () => {
       if (!isLoggedIn) { setIsLoading(false); return; }
@@ -114,7 +139,7 @@ export default function MyPage() {
           email: profileData.email || '-',
           phone: profileData.phone || '-',
           major: profileData.department || '학과 정보 없음',
-          grade: profileData.cohort ? `${profileData.cohort}기` : 0,
+          grade: profileData.cohort ? `${profileData.cohort}기` : '기수 정보 없음',
           introduction: profileData.introduce || "자기소개를 작성해주세요.",
           interests: interestsArray, // 프론트엔드 상태 이름은 interests 유지
         });
@@ -146,24 +171,31 @@ export default function MyPage() {
       setShowApplicantsModal(true);
     } catch (error) {
       console.error('신청자 목록을 불러오는 데 실패했습니다.', error);
-      alert('신청자 목록을 불러오는 데 실패했습니다. 다시 시도해주세요.');
+      setAlertMessage('신청자 목록을 불러오는 데 실패했습니다. 다시 시도해주세요.');
     }
   };
 
   const handleRemoveApplicant = async (applicantIdToRemove) => {
-    if (confirm('이 신청자를 거절(삭제)하시겠습니까?')) {
-      try {
-        await axiosInstance.delete(`/api/activities/${selectedActivity.id}/participant/${applicantIdToRemove}`);
-        const updatedList = selectedActivity.applicantsList.filter(app => app.id !== applicantIdToRemove);
-        const updatedActivity = { ...selectedActivity, applicantsList: updatedList, applicants: updatedList.length, };
-        setSelectedActivity(updatedActivity);
-        setMyOpenedActivities(prev => prev.map(activity => activity.id === selectedActivity.id ? { ...activity, applicants: updatedList.length } : activity));
-        alert('신청자를 거절했습니다.');
-      } catch (error) {
-        console.error('신청자 삭제 실패:', error);
-        alert('신청자 삭제에 실패했습니다. 다시 시도해주세요.');
+    openConfirm({
+      message: '이 신청자를 거절(삭제)하시겠습니까?',
+      confirmText: '거절',
+      cancelText: '취소',
+      onConfirm: async () => {
+        try {
+          await axiosInstance.delete(`/api/activities/${selectedActivity.id}/participant/${applicantIdToRemove}`);
+          const updatedList = selectedActivity.applicantsList.filter(app => app.id !== applicantIdToRemove);
+          const updatedActivity = { ...selectedActivity, applicantsList: updatedList, applicants: updatedList.length };
+          setSelectedActivity(updatedActivity);
+          setMyOpenedActivities(prev => prev.map(a => a.id === selectedActivity.id ? { ...a, applicants: updatedList.length } : a));
+          setAlertMessage('신청자를 거절했습니다.');
+        } catch (error) {
+          console.error('신청자 삭제 실패:', error);
+          setAlertMessage('신청자 삭제에 실패했습니다. 다시 시도해주세요.');
+        } finally {
+          closeConfirm();
+        }
       }
-    }
+    });
   };
 
   const handleApproveApplicant = async (applicantIdToApprove) => {
@@ -173,46 +205,62 @@ export default function MyPage() {
       const updatedActivity = { ...selectedActivity, applicantsList: updatedList, applicants: updatedList.length, members: selectedActivity.members + 1 };
       setSelectedActivity(updatedActivity);
       setMyOpenedActivities(prev => prev.map(activity => activity.id === selectedActivity.id ? { ...activity, applicants: updatedList.length, members: activity.members + 1 } : activity));
-      alert('신청자를 승인했습니다.');
+      setAlertMessage('신청자를 승인했습니다.');
     } catch (error) {
       console.error('신청자 승인 실패:', error);
-      alert('신청자 승인에 실패했습니다.');
+      setAlertMessage('신청자 승인에 실패했습니다.');
     }
   };
 
   const handleEndActivity = async (activityId) => {
-    if (confirm('정말로 이 활동의 모집을 마감하시겠습니까?')) {
-      try {
-        await axiosInstance.put(`/api/activities/${activityId}/status?status=ENDED`);
-        setMyOpenedActivities(prev =>
-          prev.map(act => act.id === activityId ? { ...act, status: '마감' } : act)
-        );
-        alert('모집이 마감되었습니다.');
-      } catch (error) {
-        console.error('모집 마감 처리 실패:', error);
-        alert('모집 마감 처리에 실패했습니다.');
+    openConfirm({
+      message: '정말로 이 활동의 모집을 마감하시겠습니까?',
+      confirmText: '마감',
+      cancelText: '취소',
+      onConfirm: async () => {
+        try {
+          await axiosInstance.put(`/api/activities/${activityId}/status?status=ENDED`);
+          setMyOpenedActivities(prev => prev.map(act => act.id === activityId ? { ...act, status: '마감' } : act));
+          setAlertMessage('모집이 마감되었습니다.');
+        } catch (error) {
+          console.error('모집 마감 처리 실패:', error);
+          setAlertMessage('모집 마감 처리에 실패했습니다.');
+        } finally {
+          closeConfirm();
+        }
       }
-    }
+    });
   };
 
   const handleDeleteActivity = async (activityId, status) => {
     const actionText = status === '마감' ? '삭제' : '취소';
-    if (confirm(`정말로 이 활동을 ${actionText}하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
-      try {
-        await axiosInstance.delete(`/api/activities/${activityId}`);
-        setMyOpenedActivities(prev => prev.filter(act => act.id !== activityId));
-        alert(`활동이 ${actionText}되었습니다.`);
-      } catch (error) {
-        console.error(`활동 ${actionText} 실패:`, error);
-        alert(`활동 ${actionText}에 실패했습니다.`);
+    openConfirm({
+      message: `정말로 이 활동을 ${actionText}하시겠습니까? 이 작업은 되돌릴 수 없습니다.`,
+      confirmText: actionText,
+      cancelText: '닫기',
+      onConfirm: async () => {
+        try {
+          await axiosInstance.delete(`/api/activities/${activityId}`);
+          setMyOpenedActivities(prev => prev.filter(act => act.id !== activityId));
+          setAlertMessage(`활동이 ${actionText}되었습니다.`);
+        } catch (error) {
+          console.error(`활동 ${actionText} 실패:`, error);
+          setAlertMessage(`활동 ${actionText}에 실패했습니다.`);
+        } finally {
+          closeConfirm();
+        }
       }
-    }
+    });
   };
 
   const generateAttendanceCode = () => { return Math.floor(1000 + Math.random() * 9000).toString(); };
   const formatTimeLeft = (seconds) => { const minutes = Math.floor(seconds / 60); const secs = seconds % 60; return `${minutes}:${secs.toString().padStart(2, '0')}`; };
   const handleOpenAttendance = (e, activity) => { e.preventDefault(); e.stopPropagation(); setSelectedActivity(activity); setShowAttendanceModal(true); setCustomTime(''); setPresetCode(''); };
-  const handleStartAttendance = () => { const finalTime = customTime ? parseInt(customTime) : 30; if (finalTime < 1 || finalTime > 120) { alert('출석 시간은 1분에서 120분 사이로 설정해주세요.'); return; } const code = presetCode || generateAttendanceCode(); setAttendanceCode(code); setTimeLeft(finalTime * 60); setAttendanceOpen({ ...attendanceOpen, [selectedActivity.id]: true }); const interval = setInterval(() => { setTimeLeft((prev) => { if (prev <= 1) { clearInterval(interval); setAttendanceOpen(prevOpen => ({ ...prevOpen, [selectedActivity.id]: false })); setShowAttendanceModal(false); setShowTimeEndModal(true); return 0; } return prev - 1; }); }, 1000); setTimeInterval(interval); };
+  const handleStartAttendance = () => {
+    const finalTime = customTime ? parseInt(customTime) : 30;
+    if (finalTime < 1 || finalTime > 120) { setAlertMessage('출석 시간은 1분에서 120분 사이로 설정해주세요.'); return; }
+    const code = presetCode || generateAttendanceCode(); setAttendanceCode(code); setTimeLeft(finalTime * 60); setAttendanceOpen({ ...attendanceOpen, [selectedActivity.id]: true }); const interval = setInterval(() => { setTimeLeft((prev) => { if (prev <= 1) { clearInterval(interval); setAttendanceOpen(prevOpen => ({ ...prevOpen, [selectedActivity.id]: false })); setShowAttendanceModal(false); setShowTimeEndModal(true); return 0; } return prev - 1; }); }, 1000); setTimeInterval(interval);
+  };
   const handleCloseAttendance = (activityId) => { setAttendanceOpen(prev => ({ ...prev, [activityId]: false })); setShowAttendanceModal(false); setSelectedActivity(null); setAttendanceCode(''); setTimeLeft(0); setCustomTime(''); setPresetCode(''); if (timeInterval) { clearInterval(timeInterval); setTimeInterval(null); } };
   const handleExtendTime = (additionalMinutes) => { setTimeLeft((prev) => prev + additionalMinutes * 60); };
   const handleExtendFromEndModal = (additionalMinutes) => { setTimeLeft(additionalMinutes * 60); setAttendanceOpen(prev => ({ ...prev, [selectedActivity.id]: true })); setShowTimeEndModal(false); setShowAttendanceModal(true); const interval = setInterval(() => { setTimeLeft((prev) => { if (prev <= 1) { clearInterval(interval); setAttendanceOpen(prevOpen => ({ ...prevOpen, [selectedActivity.id]: false })); setShowAttendanceModal(false); setShowTimeEndModal(true); return 0; } return prev - 1; }); }, 1000); setTimeInterval(interval); };
@@ -241,10 +289,10 @@ export default function MyPage() {
       await axiosInstance.put('/api/member/me', requestBody);
       setUserProfile(editForm); // 상태 업데이트
       setShowProfileEditModal(false); // 모달 닫기
-      alert('프로필이 성공적으로 저장되었습니다.');
+      setAlertMessage('프로필이 성공적으로 저장되었습니다.');
     } catch (error) {
       console.error('프로필 업데이트 실패:', error);
-      alert('프로필 저장에 실패했습니다. 다시 시도해주세요.');
+      setAlertMessage('프로필 저장에 실패했습니다. 다시 시도해주세요.');
     }
   };
 
@@ -268,7 +316,7 @@ export default function MyPage() {
         unreadCount={unreadCount}
         isLoggedIn={isLoggedIn}
         onNotificationClick={() => {
-          if (!isLoggedIn) { alert('로그인이 필요한 서비스입니다.'); navigate('/login'); return; }
+          if (!isLoggedIn) { setAlertMessage('로그인이 필요한 서비스입니다.'); navigate('/login'); return; }
           setShowNotificationModal(true);
         }}
       >
@@ -336,7 +384,7 @@ export default function MyPage() {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            alert(`더보기 메뉴: ${activity.title}`);
+                            setAlertMessage(`더보기 메뉴: ${activity.title}`);
                           }}
                           className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
                           aria-label="더 보기"
@@ -353,7 +401,25 @@ export default function MyPage() {
               <div onClick={() => { navigate(`/activity/${activity.id}?edit=true`) }} className="block">
                 <div className="flex items-start justify-between mb-3"> <div className="flex-1"> <h3 className="font-semibold text-gray-900 mb-1">{activity.title}</h3> <p className="text-sm text-gray-600 mb-2">팀장: {activity.leader}</p> <div className="space-y-2 text-sm text-gray-600"> <div className="flex items-center"> <i className="ri-calendar-line mr-2"></i> <span>{activity.schedule}</span> </div> <div className="flex items-center"> <i className="ri-map-pin-line mr-2"></i> <span>{activity.location}</span> </div> </div> <div className="mt-3"> <div className="flex items-center justify-between mb-2"> <div className="flex items-center text-sm text-gray-600"> <i className="ri-group-line mr-2"></i> <span>참여 인원: {activity.members}/{activity.maxMembers}명</span> </div> <span className="text-sm text-gray-500">{Math.round((activity.members / activity.maxMembers) * 100)}%</span> </div> <div className="w-full bg-gray-200 rounded-full h-2"> <div className="bg-blue-600 h-2 rounded-full transition-all duration-300" style={{ width: `${(activity.members / activity.maxMembers) * 100}%` }}></div> </div> </div> </div> <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(activity.status)}`}>{activity.status}</span> </div>
               </div>
-              <div className="flex space-x-2" onClick={(e) => e.stopPropagation()}> {activity.canCancel && (<button onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (confirm('정말로 이 활동 신청을 취소하시겠습니까?')) { alert('활동 신청이 취소되었습니다.'); } }} className="px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200"> 취소하기 </button>)} </div> </div>)))} </div>)}
+              <div className="flex space-x-2" onClick={(e) => e.stopPropagation()}> {activity.canCancel && (<button onClick={(e) => {
+                e.preventDefault(); e.stopPropagation();
+                openConfirm({
+                  message: '정말로 이 활동 신청을 취소하시겠습니까?',
+                  confirmText: '취소하기',
+                  cancelText: '닫기',
+                  onConfirm: async () => {
+                    try {
+                      // TODO: 실제 취소 API 호출이 있다면 여기에 추가
+                      setAlertMessage('활동 신청이 취소되었습니다.');
+                    } catch (e) {
+                      setAlertMessage('신청 취소 중 오류가 발생했습니다.');
+                    } finally {
+                      closeConfirm();
+                    }
+                  }
+                });
+              }
+              } className="px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200"> 취소하기 </button>)} </div> </div>)))} </div>)}
           </>
         ) : (
           <div className="text-center py-20">
@@ -483,6 +549,25 @@ export default function MyPage() {
       )}
 
       <TabBar />
+
+      {/* === 공통 Alert / Confirm 모달 === */}
+      {alertMessage && (
+        <Alert message={alertMessage} onClose={() => setAlertMessage(null)} />
+      )}
+      {confirmConfig.open && (
+        <Confirm
+          message={confirmConfig.message}
+          onCancel={() =>
+            setConfirmConfig((c) => ({ ...c, open: false, onConfirm: null }))
+          }
+          onConfirm={() => {
+            const fn = confirmConfig.onConfirm;
+            setConfirmConfig((c) => ({ ...c, open: false, onConfirm: null }));
+            if (typeof fn === 'function') fn();
+          }}
+        />
+      )}
     </div>
   );
 }
+
