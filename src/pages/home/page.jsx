@@ -95,7 +95,8 @@ export default function Home() {
       const response = await axiosInstance.get(`/api/activities?page=${page}&size=8`);
       const responseData = response.data;
       if (responseData && Array.isArray(responseData.content)) {
-        const formattedData = responseData.content.map(mapApiDataToState);
+        const approvedActivities = responseData.content.filter(activity => activity.isApproved === true);
+        const formattedData = approvedActivities.map(mapApiDataToState);
 
         setActivities(prevActivities => {
           const existingIds = new Set(prevActivities.map(act => act.id));
@@ -104,6 +105,10 @@ export default function Home() {
         });
 
         setHasMore(!responseData.last);
+
+        if (approvedActivities.length === 0 && !responseData.last) {
+          setPage(prevPage => prevPage + 1);
+        }
       } else {
         setHasMore(false);
       }
