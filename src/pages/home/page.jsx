@@ -27,20 +27,27 @@ export default function Home() {
   const formatRecurringSchedule = (schedules) => {
     if (!schedules || schedules.length === 0) return '일정 정보 없음';
     const dayMap = { MONDAY: '월', TUESDAY: '화', WEDNESDAY: '수', THURSDAY: '목', FRIDAY: '금', SATURDAY: '토', SUNDAY: '일' };
-    const days = schedules.map(s => dayMap[s.dayOfWeek] || '').join('/');
-    const time = schedules[0].startTime.substring(0, 5);
-    return `매주 ${days} ${time}`;
+    const scheduleStrings = schedules.map(s => {
+      const day = dayMap[s.dayOfWeek] || '';
+      const startTime = s.startTime.substring(0, 5);
+      const endTime = s.endTime.substring(0, 5);
+      return `${day} ${startTime}~${endTime}`;
+    });
+    return `매주 ${scheduleStrings.join(' / ')}`;
   };
 
   // 특정일 일정 포맷 함수 (소모임, 행사용)
   const formatEventSchedule = (schedules) => {
     if (!schedules || schedules.length === 0) return '일정 정보 없음';
-    const firstEvent = new Date(schedules[0].startDateTime);
-    const month = firstEvent.getMonth() + 1;
-    const day = firstEvent.getDate();
-    const hours = firstEvent.getHours().toString().padStart(2, '0');
-    const minutes = firstEvent.getMinutes().toString().padStart(2, '0');
-    return `${month}월 ${day}일 ${hours}:${minutes}`;
+    const scheduleStrings = schedules.map(s => {
+      const eventDate = new Date(s.startDateTime);
+      const month = eventDate.getMonth() + 1;
+      const day = eventDate.getDate();
+      const hours = eventDate.getHours().toString().padStart(2, '0');
+      const minutes = eventDate.getMinutes().toString().padStart(2, '0');
+      return `${month}월 ${day}일 ${hours}:${minutes}`;
+    });
+    return scheduleStrings.join(' / ');
   };
 
   const mapApiDataToState = (apiActivity) => {
