@@ -112,6 +112,21 @@ export default function ActivityDetail() {
 
   const handleEdit = () => navigate(`/create-activity`, { state: { activityData: activity.rawData } });
 
+  const handleDeleteActivity = async () => {
+    const status = activity.rawData.activityStatus;
+    const actionText = status === 'ENDED' ? '삭제' : '취소';
+    if (confirm(`정말로 이 활동을 ${actionText}하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+      try {
+        await axiosInstance.delete(`/api/activities/${activity.id}`);
+        setAlertMessage(`활동이 ${actionText}되었습니다.`);
+        navigate('/my');
+      } catch (error) {
+        console.error(`활동 ${actionText} 실패:`, error);
+        setAlertMessage(error.response?.data?.message || `활동 ${actionText}에 실패했습니다.`);
+      }
+    }
+  };
+
   if (activity === null) return (<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="text-center"><i className="ri-loader-4-line text-3xl text-gray-400 animate-spin mb-4"></i><p className="text-gray-500">활동을 불러오는 중...</p></div></div>);
   if (activity === undefined) return (<div className="min-h-screen flex flex-col items-center justify-center bg-gray-50"><h2 className="text-xl font-semibold text-gray-800">활동을 찾을 수 없습니다.</h2><button onClick={() => navigate('/home')} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg">홈으로 돌아가기</button></div>);
 
@@ -162,8 +177,16 @@ export default function ActivityDetail() {
             <div className="space-y-4">{activity.curriculum.map((item) => (<div key={item.week} className="p-4 bg-gray-50 rounded-lg"><h4 className="font-bold text-blue-600 mb-1">{item.week}주차: {item.title}</h4><p className="text-sm text-gray-700 whitespace-pre-wrap">{item.content}</p></div>))}</div>
           </section>
         )}
-        <div className="pt-2">
-          {isOwner ? (<button onClick={handleEdit} className="w-full py-3 rounded-lg font-semibold transition-colors bg-green-600 text-white hover:bg-green-700 flex items-center justify-center"><i className="ri-pencil-line mr-2"></i>편집하기</button>) : isApplied ? (<button onClick={handleCancel} className="w-full py-3 rounded-lg font-semibold transition-colors bg-red-100 text-red-700 hover:bg-red-200">신청 취소하기</button>) : (<button onClick={handleApply} disabled={activity.status === '마감'} className={`w-full py-3 rounded-lg font-semibold transition-colors ${activity.status === '마감' ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{activity.status === '마감' ? '모집 마감' : '신청하기'}</button>)}
+        <div className="pt-2 space-y-2">
+          {isOwner ? (
+            <>
+              <button onClick={handleEdit} className="w-full py-3 rounded-lg font-semibold transition-colors bg-green-600 text-white hover:bg-green-700 flex items-center justify-center"><i className="ri-pencil-line mr-2"></i>편집하기</button>
+              <button onClick={handleDeleteActivity} className="w-full py-3 rounded-lg font-semibold transition-colors bg-red-500 text-white hover:bg-red-600 flex items-center justify-center">
+                <i className="ri-delete-bin-line mr-2"></i>
+                {activity.rawData.activityStatus === 'ENDED' ? '활동삭제' : '개설취소'}
+              </button>
+            </>
+          ) : isApplied ? (<button onClick={handleCancel} className="w-full py-3 rounded-lg font-semibold transition-colors bg-red-100 text-red-700 hover:bg-red-200">신청 취소하기</button>) : (<button onClick={handleApply} disabled={activity.status === '마감'} className={`w-full py-3 rounded-lg font-semibold transition-colors ${activity.status === '마감' ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{activity.status === '마감' ? '모집 마감' : '신청하기'}</button>)}
         </div>
       </main>
       {showApplyModal && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center"><div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4"><i className="ri-question-line text-2xl text-blue-600"></i></div><h3 className="text-lg font-semibold text-gray-900 mb-2">활동 신청</h3><p className="text-gray-600">'{activity.title}'에 신청하시겠습니까?</p><div className="flex space-x-3 mt-6"><button onClick={() => setShowApplyModal(false)} className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium">취소</button><button onClick={confirmApply} className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium">신청하기</button></div></div></div>)}

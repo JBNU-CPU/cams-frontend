@@ -1,6 +1,8 @@
 // 후보 1 -> 페이지 스크롤 안하면 무한히 api요청 때림;;
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { openModal, closeModal } from '../../store/uiSlice';
 import TabBar from '../../components/feature/TabBar';
 import ActivityCard from './components/ActivityCard';
 import SearchFilter from './components/SearchFilter';
@@ -16,7 +18,8 @@ export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(true);
   const navigate = useNavigate();
   const { notificationList, unreadCount, dismissNotification, dismissAllNotifications } = useNotifications();
-  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const showNotificationModal = useSelector(state => state.ui.isModalOpen);
+  const dispatch = useDispatch();
   const categories = ['전체', '세션', '스터디', '프로젝트', '소모임', '행사'];
   const [activities, setActivities] = useState([]);
   const [page, setPage] = useState(0);
@@ -158,7 +161,7 @@ export default function Home() {
         title="전체 활동"
         unreadCount={unreadCount}
         isLoggedIn={isLoggedIn}
-        onNotificationClick={() => setShowNotificationModal(true)}
+        onNotificationClick={() => dispatch(openModal())}
       >
         <div className="flex space-x-2 overflow-x-auto">
           {categories.map((category) => (
@@ -214,7 +217,7 @@ export default function Home() {
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">알림</h3>
                 <button onClick={
-                  () => setShowNotificationModal(false)}
+                  () => dispatch(closeModal())}
                   className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 transition-colors" >
                   <i className="ri-close-line text-gray-600"></i>
                 </button>
@@ -250,7 +253,7 @@ export default function Home() {
             </div>
             {notificationList.length > 0 &&
               (<div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
-                <button onClick={() => { dismissAllNotifications(); setShowNotificationModal(false); }}
+                <button onClick={() => { dismissAllNotifications(); dispatch(closeModal()); }}
                   className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors" >
                   모든 알림 지우기
                 </button> </div>)} </div> </div>

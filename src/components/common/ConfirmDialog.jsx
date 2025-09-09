@@ -1,3 +1,7 @@
+import { useEffect } from 'react';
+import { useDispatch } from 'react-redux';
+import { openModal, closeModal } from '../../store/uiSlice';
+
 export default function ConfirmDialog({
     open,
     message,              // ✅ message prop 받기
@@ -6,6 +10,22 @@ export default function ConfirmDialog({
     confirmText = '확인',
     cancelText = '취소',
 }) {
+    const dispatch = useDispatch();
+
+    useEffect(() => {
+        if (open) {
+            dispatch(openModal());
+        }
+
+        return () => {
+            dispatch(closeModal());
+        };
+    }, [open, dispatch]);
+
+    if (!open) {
+        return null;
+    }
+
     return (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-50">
             <div className="bg-white px-6 py-4 rounded-lg shadow-xl text-center space-y-4 max-w-sm w-full">

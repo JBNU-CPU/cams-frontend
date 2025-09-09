@@ -1,10 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './authSlice';
+import uiReducer from './uiSlice';
 
 const store = configureStore({
     reducer: {
         auth: authReducer,
-        // 다른 slice가 있다면 여기에 추가
+        ui: uiReducer,
     },
 });
 
