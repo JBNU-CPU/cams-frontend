@@ -3,6 +3,61 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import axiosInstance from '../../api/axiosInstance';
 import Alert from '../../components/common/Alert';
 
+const TimeSelect = ({ value, onChange, minTime }) => {
+  const [hour, minute] = value ? value.split(':') : ['', ''];
+
+  const allHours = Array.from({ length: 14 }, (_, i) => (i + 9).toString().padStart(2, '0'));
+  const allMinutes = Array.from({ length: 6 }, (_, i) => (i * 10).toString().padStart(2, '0'));
+
+  const [minHour, minMinute] = minTime ? minTime.split(':') : [null, null];
+
+  const availableHours = allHours.filter(h => !minHour || h >= minHour);
+
+  const availableMinutes = allMinutes.filter(m => {
+    if (!minTime) return true;
+    if (!hour || hour < minHour) return false;
+    if (hour > minHour) return true;
+    // hour === minHour
+    return m > minMinute;
+  });
+
+  const handleHourChange = (e) => {
+    const newHour = e.target.value;
+    onChange(`${newHour}:${minute || '00'}`);
+  };
+
+  const handleMinuteChange = (e) => {
+    const newMinute = e.target.value;
+    onChange(`${hour || (minHour || '09')}:${newMinute}`);
+  };
+
+  return (
+    <div className="flex gap-2">
+      <select
+        value={hour}
+        onChange={handleHourChange}
+        className="w-full px-3 py-3 border border-gray-200 rounded-lg text-center font-medium bg-white"
+      >
+        <option value="" disabled>시</option>
+        {availableHours.map(h => (
+          <option key={h} value={h}>{h}</option>
+        ))}
+      </select>
+      <select
+        value={minute}
+        onChange={handleMinuteChange}
+        disabled={!hour && !!minTime}
+        className="w-full px-3 py-3 border border-gray-200 rounded-lg text-center font-medium bg-white disabled:bg-gray-100"
+      >
+        <option value="" disabled>분</option>
+        {availableMinutes.map(m => (
+          <option key={m} value={m}>{m}</option>
+        ))}
+      </select>
+    </div>
+  );
+};
+
 export default function CreateActivity() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -30,8 +85,6 @@ export default function CreateActivity() {
 
   const activityTypes = ['세션', '스터디', '프로젝트', '소모임', '행사'];
   const weekDays = ['월', '화', '수', '목', '금', '토', '일'];
-  const sortDays = (arr) =>
-    [...arr].sort((a, b) => weekDays.indexOf(a) - weekDays.indexOf(b));
 
   const isRecurringActivity = ['세션', '스터디', '프로젝트'].includes(formData.activityType);
   const isEventActivity = ['소모임', '행사'].includes(formData.activityType);
@@ -70,18 +123,14 @@ export default function CreateActivity() {
       });
 
       if (activityData.recurringSchedules && activityData.recurringSchedules.length > 0) {
-        const first = activityData.recurringSchedules[0];
-        setSchedules([{
-          id: '1',
-          days: sortDays([
-            ...new Set(
-              activityData.recurringSchedules.map(s => dayMapReverse[s.dayOfWeek])
-            )
-          ]),
-          startTime: first.startTime ? first.startTime.substring(0, 5) : '',
-          endTime: first.endTime ? first.endTime.substring(0, 5) : '',
-          date: ''
-        }]);
+        const newSchedules = activityData.recurringSchedules.map((s, i) => ({
+          id: String(i + 1),
+          day: dayMapReverse[s.dayOfWeek],
+          startTime: s.startTime ? s.startTime.substring(0, 5) : '',
+          endTime: s.endTime ? s.endTime.substring(0, 5) : ''
+        }));
+        newSchedules.sort((a, b) => weekDays.indexOf(a.day) - weekDays.indexOf(b.day));
+        setSchedules(newSchedules);
       } else if (activityData.eventSchedule && activityData.eventSchedule.length > 0) {
         setSchedules(
           activityData.eventSchedule.map((s, i) => ({
@@ -109,21 +158,32 @@ export default function CreateActivity() {
   const handleFormChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
 
-  // 요일 토글: 추가 시 항상 월~일 순으로 정렬
-  const handleDayToggle = (scheduleId, day) => {
-    setSchedules(prev =>
-      prev.map(s => {
-        if (s.id !== scheduleId) return s;
-        const exists = s.days.includes(day);
-        const next = exists ? s.days.filter(d => d !== day) : sortDays([...s.days, day]);
-        return { ...s, days: next };
-      })
-    );
+  const handleRecurringDayToggle = (day) => {
+    setSchedules(prev => {
+      const exists = prev.some(s => s.day === day);
+      if (exists) {
+        return prev.filter(s => s.day !== day);
+      } else {
+        const newSchedule = { id: Date.now().toString(), day: day, startTime: '', endTime: '' };
+        const newSchedules = [...prev, newSchedule];
+        newSchedules.sort((a, b) => weekDays.indexOf(a.day) - weekDays.indexOf(b.day));
+        return newSchedules;
+      }
+    });
   };
 
   const handleTimeChange = (scheduleId, field, time) => {
     setSchedules(prev =>
-      prev.map(s => (s.id === scheduleId ? { ...s, [field]: time } : s))
+      prev.map(s => {
+        if (s.id !== scheduleId) return s;
+
+        const newSchedule = { ...s, [field]: time };
+
+        if (field === 'startTime' && newSchedule.endTime && newSchedule.endTime <= time) {
+          newSchedule.endTime = ''; // Reset endTime
+        }
+        return newSchedule;
+      })
     );
   };
 
@@ -134,7 +194,7 @@ export default function CreateActivity() {
     ]);
 
   const removeSchedule = (id) =>
-    setSchedules(prev => (prev.length > 1 ? prev.filter(s => s.id !== id) : prev));
+    setSchedules(prev => prev.filter(s => s.id !== id));
 
   const handleCurriculumChange = (index, field, value) =>
     setCurriculums(prev => prev.map((c, i) => (i === index ? { ...c, [field]: value } : c)));
@@ -150,11 +210,15 @@ export default function CreateActivity() {
     setScheduleError('');
 
     if (isRecurringActivity) {
+      if (schedules.length === 0) {
+        setScheduleError('정기 일정은 요일을 하나 이상 선택해주세요.');
+        return false;
+      }
       const invalid = schedules.some(
-        s => s.days.length === 0 || !s.startTime || !s.endTime
+        s => !s.day || !s.startTime || !s.endTime
       );
       if (invalid) {
-        setScheduleError('정기 일정은 요일과 시작/종료 시간을 모두 선택해주세요.');
+        setScheduleError('정기 일정은 시작/종료 시간을 모두 선택해주세요.');
         return false;
       }
     }
@@ -181,7 +245,7 @@ export default function CreateActivity() {
 
   const scheduleValid =
     isRecurringActivity
-      ? schedules.every(s => s.days.length > 0 && s.startTime && s.endTime)
+      ? schedules.length > 0 && schedules.every(s => s.day && s.startTime && s.endTime)
       : isEventActivity
         ? schedules.every(s => s.date && s.startTime && s.endTime)
         : true;
@@ -204,7 +268,7 @@ export default function CreateActivity() {
       '소모임': 'MEETING',
       '행사': 'GENERAL'
     };
-    const dayMapReverse = {
+    const dayMap = {
       '월': 'MONDAY',
       '화': 'TUESDAY',
       '수': 'WEDNESDAY',
@@ -223,13 +287,11 @@ export default function CreateActivity() {
       maxParticipants: parseInt(formData.maxParticipants, 10),
       activityType: activityTypeMap[formData.activityType],
       recurringSchedules: isRecurringActivity
-        ? schedules.flatMap(s =>
-          s.days.map(day => ({
-            dayOfWeek: dayMapReverse[day],
-            startTime: s.startTime,
-            endTime: s.endTime
-          }))
-        )
+        ? schedules.map(s => ({
+          dayOfWeek: dayMap[s.day],
+          startTime: s.startTime,
+          endTime: s.endTime
+        }))
         : [],
       eventSchedule: isEventActivity
         ? schedules.map(s => ({
@@ -316,7 +378,16 @@ export default function CreateActivity() {
                   <button
                     key={type}
                     type="button"
-                    onClick={() => setFormData({ ...formData, activityType: type })}
+                    onClick={() => {
+                      const newActivityType = type;
+                      setFormData({ ...formData, activityType: newActivityType });
+
+                      if (['세션', '스터디', '프로젝트'].includes(newActivityType)) {
+                        if (!isRecurringActivity) setSchedules([]);
+                      } else if (['소모임', '행사'].includes(newActivityType)) {
+                        if (!isEventActivity) setSchedules([{ id: Date.now().toString(), days: [], startTime: '', endTime: '', date: '' }]);
+                      }
+                    }}
                     className={`py-3 px-4 rounded-lg text-sm font-medium border ${formData.activityType === type
                       ? 'bg-blue-600 text-white border-blue-600'
                       : 'bg-gray-50 text-gray-700 border-gray-200'
@@ -414,6 +485,29 @@ export default function CreateActivity() {
               일정 설정
             </h2>
 
+            {isRecurringActivity && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  진행 요일 <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {weekDays.map((day) => (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => handleRecurringDayToggle(day)}
+                      className={`py-2 px-3 rounded-lg text-sm font-medium border ${schedules.some(s => s.day === day)
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-700 border-gray-200'
+                        }`}
+                    >
+                      {day}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {scheduleError && (
               <p className="mb-3 text-sm text-red-600">{scheduleError}</p>
             )}
@@ -423,9 +517,9 @@ export default function CreateActivity() {
                 <div key={schedule.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-medium text-gray-900">
-                      {isRecurringActivity ? '정기 일정' : `일정 ${index + 1}`}
+                      {isRecurringActivity ? `정기 일정 (${schedule.day})` : `일정 ${index + 1}`}
                     </h3>
-                    {schedules.length > 1 && (
+                    {(isRecurringActivity || (isEventActivity && schedules.length > 1)) && (
                       <button
                         type="button"
                         onClick={() => removeSchedule(schedule.id)}
@@ -437,29 +531,6 @@ export default function CreateActivity() {
                   </div>
 
                   <div className="space-y-4">
-                    {isRecurringActivity && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-3">
-                          진행 요일 <span className="text-red-500">*</span>
-                        </label>
-                        <div className="grid grid-cols-4 gap-2">
-                          {weekDays.map((day) => (
-                            <button
-                              key={day}
-                              type="button"
-                              onClick={() => handleDayToggle(schedule.id, day)}
-                              className={`py-2 px-3 rounded-lg text-sm font-medium border ${schedule.days.includes(day)
-                                ? 'bg-blue-600 text-white border-blue-600'
-                                : 'bg-white text-gray-700 border-gray-200'
-                                }`}
-                            >
-                              {day}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
                     {isEventActivity && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -481,20 +552,17 @@ export default function CreateActivity() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs text-gray-600 mb-2">시작 시간</label>
-                          <input
-                            type="time"
+                          <TimeSelect
                             value={schedule.startTime}
-                            onChange={(e) => handleTimeChange(schedule.id, 'startTime', e.target.value)}
-                            className="w-full px-3 py-3 border border-gray-200 rounded-lg text-center font-medium"
+                            onChange={(time) => handleTimeChange(schedule.id, 'startTime', time)}
                           />
                         </div>
                         <div>
                           <label className="block text-xs text-gray-600 mb-2">종료 시간</label>
-                          <input
-                            type="time"
+                          <TimeSelect
                             value={schedule.endTime}
-                            onChange={(e) => handleTimeChange(schedule.id, 'endTime', e.target.value)}
-                            className="w-full px-3 py-3 border border-gray-200 rounded-lg text-center font-medium"
+                            onChange={(time) => handleTimeChange(schedule.id, 'endTime', time)}
+                            minTime={schedule.startTime}
                           />
                         </div>
                       </div>

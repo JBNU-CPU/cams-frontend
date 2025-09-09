@@ -25,7 +25,7 @@ const formatEventSchedule = (schedules) => {
 };
 const mapActivityData = (apiActivity) => {
   const categoryMap = { SESSION: '세션', STUDY: '스터디', PROJECT: '프로젝트', MEETING: '소모임', GENERAL: '행사' };
-  const statusMap = { NOT_STARTED: '승인 대기', STARTED: '진행 중', ENDED: '마감' };
+  const statusMap = { NOT_STARTED: '모집 전', STARTED: '모집 중', ENDED: '마감' };
 
   let scheduleText = '';
   const recurringTypes = ['SESSION', 'STUDY', 'PROJECT'];
@@ -82,6 +82,7 @@ export default function MyPage() {
   const [customTime, setCustomTime] = useState('');
   const [presetCode, setPresetCode] = useState('');
   const [showTimeEndModal, setShowTimeEndModal] = useState(false);
+  const [showStatusChangeModal, setShowStatusChangeModal] = useState(false);
 
   const [isLoggedIn, setIsLoggedIn] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
@@ -114,7 +115,7 @@ export default function MyPage() {
           email: profileData.email || '-',
           phone: profileData.phone || '-',
           major: profileData.department || '학과 정보 없음',
-          grade: profileData.cohort ? `${profileData.cohort}기` : 0,
+          grade: profileData.cohort ? `${profileData.cohort}기` : '기수 정보 없음',
           introduction: profileData.introduce || "자기소개를 작성해주세요.",
           interests: interestsArray, // 프론트엔드 상태 이름은 interests 유지
         });
@@ -133,7 +134,7 @@ export default function MyPage() {
   }, [isLoggedIn]);
 
   // --- 핸들러 함수들 ---
-  const getStatusColor = (status) => { switch (status) { case '진행 중': case '참여 중': return 'bg-green-100 text-green-700'; case '승인 대기': return 'bg-yellow-100 text-yellow-700'; case '마감': return 'bg-red-100 text-red-700'; default: return 'bg-gray-100 text-gray-700'; } };
+  const getStatusColor = (status) => { switch (status) { case '모집 중': case '참여 중': return 'bg-green-100 text-green-700'; case '승인 대기': return 'bg-yellow-100 text-yellow-700'; case '마감': return 'bg-red-100 text-red-700'; default: return 'bg-gray-100 text-gray-700'; } };
 
   const handleShowApplicants = async (e, activity) => {
     e.preventDefault(); e.stopPropagation();
@@ -148,6 +149,13 @@ export default function MyPage() {
       console.error('신청자 목록을 불러오는 데 실패했습니다.', error);
       alert('신청자 목록을 불러오는 데 실패했습니다. 다시 시도해주세요.');
     }
+  };
+
+  const handleOpenStatusChange = (e, activity) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedActivity(activity);
+    setShowStatusChangeModal(true);
   };
 
   const handleRemoveApplicant = async (applicantIdToRemove) => {
@@ -180,17 +188,21 @@ export default function MyPage() {
     }
   };
 
-  const handleEndActivity = async (activityId) => {
-    if (confirm('정말로 이 활동의 모집을 마감하시겠습니까?')) {
+  const handleChangeStatus = async (activityId, newStatus) => {
+    const statusMap = { NOT_STARTED: '모집 전', STARTED: '모집 중', ENDED: '마감' };
+    const newStatusLabel = statusMap[newStatus];
+
+    if (confirm(`정말로 이 활동의 모집 상태를 '${newStatusLabel}'(으)로 변경하시겠습니까?`)) {
       try {
-        await axiosInstance.put(`/api/activities/${activityId}/status?status=ENDED`);
+        await axiosInstance.put(`/api/activities/${activityId}/status?status=${newStatus}`);
         setMyOpenedActivities(prev =>
-          prev.map(act => act.id === activityId ? { ...act, status: '마감' } : act)
+          prev.map(act => act.id === activityId ? { ...act, status: newStatusLabel } : act)
         );
-        alert('모집이 마감되었습니다.');
+        alert(`모집 상태가 '${newStatusLabel}'(으)로 변경되었습니다.`);
+        setShowStatusChangeModal(false);
       } catch (error) {
-        console.error('모집 마감 처리 실패:', error);
-        alert('모집 마감 처리에 실패했습니다.');
+        console.error('모집 상태 변경 실패:', error);
+        alert('모집 상태 변경에 실패했습니다.');
       }
     }
   };
@@ -308,41 +320,7 @@ export default function MyPage() {
                       </div>
                       <div className="flex space-x-2" onClick={(e) => e.stopPropagation()}>
                         <button onClick={(e) => handleShowApplicants(e, activity)} className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">신청자 보기</button>
-                        {(() => {
-                          switch (activity.status) {
-                            case '진행 중':
-                              return (
-                                <button onClick={() => handleEndActivity(activity.id)} className="flex-1 py-2 bg-yellow-100 text-yellow-800 rounded-lg text-sm font-medium hover:bg-yellow-200">
-                                  신청 마감
-                                </button>
-                              );
-                            case '마감':
-                              return (
-                                <button onClick={() => handleDeleteActivity(activity.id, activity.status)} className="flex-1 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200">
-                                  활동 삭제
-                                </button>
-                              );
-                            case '승인 대기':
-                              return (
-                                <button onClick={() => handleDeleteActivity(activity.id, activity.status)} className="flex-1 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300">
-                                  개설 취소
-                                </button>
-                              );
-                            default:
-                              return null;
-                          }
-                        })()}
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            alert(`더보기 메뉴: ${activity.title}`);
-                          }}
-                          className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
-                          aria-label="더 보기"
-                        >
-                          <i className="ri-more-2-line"></i>
-                        </button>
+                        <button onClick={(e) => handleOpenStatusChange(e, activity)} className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">모집 상태 변경</button>
                       </div>
                     </div>
                   ))
@@ -370,6 +348,46 @@ export default function MyPage() {
       </div>
 
       {showNotificationModal && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"> <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col"> <div className="px-6 py-4 border-b border-gray-100"> <div className="flex items-center justify-between"> <h3 className="text-lg font-semibold text-gray-900">알림</h3> <button onClick={() => setShowNotificationModal(false)} className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 transition-colors" > <i className="ri-close-line text-gray-600"></i> </button> </div> </div> <div className="flex-1 overflow-y-auto"> {notificationList.length === 0 ? (<div className="text-center py-12"> <i className="ri-notification-off-line text-4xl text-gray-300 mb-4"></i> <p className="text-gray-500">새로운 알림이 없습니다.</p> </div>) : (<div className="divide-y divide-gray-100"> {notificationList.map((notification) => (<div key={notification.id} className={`p-4 hover:bg-gray-50 transition-colors ${!notification.isRead ? 'bg-blue-50' : ''}`} > <div className="flex items-start space-x-3"> <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${getNotificationColor(notification.type)}`}> <i className={`${getNotificationIcon(notification.type)} text-lg`}></i> </div> <div className="flex-1 min-w-0"> <div className="flex items-center justify-between mb-1"> <h4 className="font-medium text-gray-900 truncate">{notification.title}</h4> {!notification.isRead && (<div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0 ml-2"></div>)} </div> <p className="text-sm text-gray-600 mb-1">{notification.message}</p> <p className="text-xs text-gray-500">{notification.time}</p> </div> <button onClick={() => dismissNotification(notification.id)} className="w-8 h-8 flex-shrink-0 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors" aria-label="알림 삭제" > <i className="ri-close-line text-lg"></i> </button> </div> </div>))} </div>)} </div> {notificationList.length > 0 && (<div className="px-6 py-4 bg-gray-50 border-t border-gray-100"> <button onClick={() => { dismissAllNotifications(); setShowNotificationModal(false); }} className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors" > 모든 알림 지우기 </button> </div>)} </div> </div>)}
+
+      {showStatusChangeModal && selectedActivity && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">모집 상태 변경</h3>
+                <p className="text-sm text-gray-600 mt-1">{selectedActivity.title}</p>
+              </div>
+              <button onClick={() => setShowStatusChangeModal(false)} className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 transition-colors">
+                <i className="ri-close-line text-gray-600"></i>
+              </button>
+            </div>
+          </div>
+          <div className="p-6 space-y-3">
+            <p className="text-sm text-gray-600">현재 상태: <span className="font-medium text-gray-800">{selectedActivity.status}</span></p>
+            <div className="space-y-2">
+              {Object.entries({ NOT_STARTED: '모집 전', STARTED: '모집 중', ENDED: '마감' })
+                .filter(([, value]) => value !== selectedActivity.status)
+                .map(([key, value]) => (
+                  <button
+                    key={key}
+                    onClick={() => handleChangeStatus(selectedActivity.id, key)}
+                    className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    {value}(으)로 변경
+                  </button>
+                ))
+              }
+            </div>
+          </div>
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+            <button onClick={() => setShowStatusChangeModal(false)} className="w-full py-3 bg-gray-200 text-gray-800 rounded-xl font-medium hover:bg-gray-300 transition-colors">
+              취소
+            </button>
+          </div>
+        </div>
+      </div>
+      )}
 
       {showApplicantsModal && selectedActivity && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

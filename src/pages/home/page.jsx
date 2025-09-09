@@ -1,6 +1,8 @@
 // 후보 1 -> 페이지 스크롤 안하면 무한히 api요청 때림;;
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { openModal, closeModal } from '../../store/uiSlice';
 import TabBar from '../../components/feature/TabBar';
 import ActivityCard from './components/ActivityCard';
 import SearchFilter from './components/SearchFilter';
@@ -16,7 +18,8 @@ export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(true);
   const navigate = useNavigate();
   const { notificationList, unreadCount, dismissNotification, dismissAllNotifications } = useNotifications();
-  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const showNotificationModal = useSelector(state => state.ui.isModalOpen);
+  const dispatch = useDispatch();
   const categories = ['전체', '세션', '스터디', '프로젝트', '소모임', '행사'];
   const [activities, setActivities] = useState([]);
   const [page, setPage] = useState(0);
@@ -27,20 +30,27 @@ export default function Home() {
   const formatRecurringSchedule = (schedules) => {
     if (!schedules || schedules.length === 0) return '일정 정보 없음';
     const dayMap = { MONDAY: '월', TUESDAY: '화', WEDNESDAY: '수', THURSDAY: '목', FRIDAY: '금', SATURDAY: '토', SUNDAY: '일' };
-    const days = schedules.map(s => dayMap[s.dayOfWeek] || '').join('/');
-    const time = schedules[0].startTime.substring(0, 5);
-    return `매주 ${days} ${time}`;
+    const scheduleStrings = schedules.map(s => {
+      const day = dayMap[s.dayOfWeek] || '';
+      const startTime = s.startTime.substring(0, 5);
+      const endTime = s.endTime.substring(0, 5);
+      return `${day} ${startTime}~${endTime}`;
+    });
+    return `매주 ${scheduleStrings.join(' / ')}`;
   };
 
   // 특정일 일정 포맷 함수 (소모임, 행사용)
   const formatEventSchedule = (schedules) => {
     if (!schedules || schedules.length === 0) return '일정 정보 없음';
-    const firstEvent = new Date(schedules[0].startDateTime);
-    const month = firstEvent.getMonth() + 1;
-    const day = firstEvent.getDate();
-    const hours = firstEvent.getHours().toString().padStart(2, '0');
-    const minutes = firstEvent.getMinutes().toString().padStart(2, '0');
-    return `${month}월 ${day}일 ${hours}:${minutes}`;
+    const scheduleStrings = schedules.map(s => {
+      const eventDate = new Date(s.startDateTime);
+      const month = eventDate.getMonth() + 1;
+      const day = eventDate.getDate();
+      const hours = eventDate.getHours().toString().padStart(2, '0');
+      const minutes = eventDate.getMinutes().toString().padStart(2, '0');
+      return `${month}월 ${day}일 ${hours}:${minutes}`;
+    });
+    return scheduleStrings.join(' / ');
   };
 
   const mapApiDataToState = (apiActivity) => {
@@ -88,7 +98,8 @@ export default function Home() {
       const response = await axiosInstance.get(`/api/activities?page=${page}&size=8`);
       const responseData = response.data;
       if (responseData && Array.isArray(responseData.content)) {
-        const formattedData = responseData.content.map(mapApiDataToState);
+        const approvedActivities = responseData.content.filter(activity => activity.isApproved === true);
+        const formattedData = approvedActivities.map(mapApiDataToState);
 
         setActivities(prevActivities => {
           const existingIds = new Set(prevActivities.map(act => act.id));
@@ -97,6 +108,10 @@ export default function Home() {
         });
 
         setHasMore(!responseData.last);
+
+        if (approvedActivities.length === 0 && !responseData.last) {
+          setPage(prevPage => prevPage + 1);
+        }
       } else {
         setHasMore(false);
       }
@@ -146,7 +161,7 @@ export default function Home() {
         title="전체 활동"
         unreadCount={unreadCount}
         isLoggedIn={isLoggedIn}
-        onNotificationClick={() => setShowNotificationModal(true)}
+        onNotificationClick={() => dispatch(openModal())}
       >
         <div className="flex space-x-2 overflow-x-auto">
           {categories.map((category) => (
@@ -202,7 +217,7 @@ export default function Home() {
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">알림</h3>
                 <button onClick={
-                  () => setShowNotificationModal(false)}
+                  () => dispatch(closeModal())}
                   className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 transition-colors" >
                   <i className="ri-close-line text-gray-600"></i>
                 </button>
@@ -238,7 +253,7 @@ export default function Home() {
             </div>
             {notificationList.length > 0 &&
               (<div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
-                <button onClick={() => { dismissAllNotifications(); setShowNotificationModal(false); }}
+                <button onClick={() => { dismissAllNotifications(); dispatch(closeModal()); }}
                   className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors" >
                   모든 알림 지우기
                 </button> </div>)} </div> </div>
