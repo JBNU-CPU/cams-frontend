@@ -89,7 +89,7 @@ export default function ActivityDetail() {
       setShowApplyModal(false);
       setAlertMessage('활동 신청이 완료되었습니다!'); // 알림
       setActivity(prev => ({ ...prev, currentMembers: prev.currentMembers + 1 }));
-      navigate("/")
+      navigate("/home")
     } catch (error) {
       setShowApplyModal(false);
       setAlertMessage(error.response?.data?.message || '활동 신청에 실패했습니다.');
