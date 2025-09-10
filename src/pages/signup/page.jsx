@@ -65,8 +65,9 @@ export default function SignupPage() {
               alt="로고"
               className="mx-auto w-full h-auto max-w-[120px] sm:max-w-[160px] md:max-w-[200px]"
           />
+          <p className="mt-2 text-base text-gray-600 tracking-tight">CPU 활동 관리 시스템</p>
           <p className="mt-4 text-xl font-bold text-gray-800">
-            전북대학교 중앙 IT 동아리 CPU
+            회원가입
           </p>
         </div>
 
