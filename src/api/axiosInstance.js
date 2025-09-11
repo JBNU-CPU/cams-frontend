@@ -1,5 +1,6 @@
 // api/axiosInstance.js
 import axios from "axios";
+import { logout } from "../store/authSlice";
 
 // const BASE_URL = 'http://localhost:8080';
 const BASE_URL = "https://jbnucpu.co.kr/api";
@@ -60,7 +61,7 @@ axiosInstance.interceptors.response.use(
       originalRequest.url === "/reissue" ||
       originalRequest.__isReissue === true;
 
-    if (status === 401 && !isReissueCall) {
+    if ((status === 401 || status === 403) && !isReissueCall) {
       // 이미 재시도한 요청(무한루프 방지)
       if (originalRequest._retry) {
         return Promise.reject(error);
@@ -104,6 +105,10 @@ axiosInstance.interceptors.response.use(
         processQueue(refreshError, null);
         // 실패 시 정리 후 로그인 화면으로
         localStorage.removeItem("accessToken");
+        try {
+          console.log("무제발생!!");
+          store.dispatch(logout());
+        } catch {}
         isRefreshing = false;
         pendingQueue = [];
         window.location.href = "/login";
@@ -114,8 +119,13 @@ axiosInstance.interceptors.response.use(
     }
 
     // 재발급 자체가 401이면 로그아웃
-    if (status === 401 && isReissueCall) {
+    if ((status === 401 || status === 403) && isReissueCall) {
       localStorage.removeItem("accessToken");
+      try {
+        console.log("무제발생!!");
+
+        store.dispatch(logout());
+      } catch {}
       window.location.href = "/login";
     }
 
