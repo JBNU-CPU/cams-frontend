@@ -1,43 +1,44 @@
 // api/axiosInstance.js
-import axios from 'axios';
+import axios from "axios";
 
 // const BASE_URL = 'http://localhost:8080';
 const BASE_URL = "https://jbnucpu.co.kr/api";
+// const BASE_URL = "https://jbnucpu.co.kr/test";
 
 export const axiosInstance = axios.create({
-    baseURL: BASE_URL,
-    withCredentials: true,
+  baseURL: BASE_URL,
+  withCredentials: true,
 });
 
 // ❗ 재발급은 인터셉터가 없는 클라이언트로 호출
 const refreshClient = axios.create({
-    baseURL: BASE_URL,
-    withCredentials: true,
+  baseURL: BASE_URL,
+  withCredentials: true,
 });
 
 let isRefreshing = false;
 let pendingQueue = []; // { resolve, reject, originalRequest }
 
 function processQueue(error, token = null) {
-    pendingQueue.forEach(({ resolve, reject, originalRequest }) => {
-        if (error) {
-            reject(error);
-        } else {
-            // 새 토큰으로 원요청 재시도
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            resolve(axiosInstance(originalRequest));
-        }
-    });
-    pendingQueue = [];
+  pendingQueue.forEach(({ resolve, reject, originalRequest }) => {
+    if (error) {
+      reject(error);
+    } else {
+      // 새 토큰으로 원요청 재시도
+      originalRequest.headers.Authorization = `Bearer ${token}`;
+      resolve(axiosInstance(originalRequest));
+    }
+  });
+  pendingQueue = [];
 }
 
 // 요청 인터셉터: Access 토큰 붙이기
 axiosInstance.interceptors.request.use((config) => {
-    const accessToken = localStorage.getItem('accessToken');
-    if (accessToken) {
-        config.headers.Authorization = `Bearer ${accessToken}`;
-    }
-    return config;
+  const accessToken = localStorage.getItem("accessToken");
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
+  }
+  return config;
 });
 
 // 응답 인터셉터
