@@ -48,6 +48,8 @@ export default function LoginPage() {
                         alt="로고"
                         className="mx-auto w-full h-auto max-w-[120px] sm:max-w-[160px] md:max-w-[200px]"
                     />
+                    <h1 className="mt-6 text-2xl font-bold text-gray-800">전북대학교 중앙 IT 동아리 CPU</h1>
+                    <p className="mt-2 text-base text-gray-600 tracking-tight">활동 관리 시스템</p>
                 </div>
                 <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
                     <form onSubmit={handleSubmit} className="space-y-6">

@@ -49,14 +49,12 @@ export default function Header({ title, unreadCount, isLoggedIn, onNotificationC
             )}
 
             {/* ✅ ConfirmDialog */}
-            {showConfirm && (
-                <ConfirmDialog
-                    open={showConfirm}
-                    message="로그아웃 하시겠습니까?"
-                    onConfirm={confirmLogout}
-                    onCancel={cancelLogout}
-                />
-            )}
+            <ConfirmDialog
+                open={showConfirm}
+                message="로그아웃 하시겠습니까?"
+                onConfirm={confirmLogout}
+                onCancel={cancelLogout}
+            />
 
             <div className="px-4 py-4">
                 <div className="relative flex items-center justify-between h-10">
@@ -66,12 +64,27 @@ export default function Header({ title, unreadCount, isLoggedIn, onNotificationC
                     </h1>
                     <div className="flex items-center space-x-2">
                         {isLoggedIn ? (
-                            <button
-                                onClick={handleLogout}
-                                className="w-10 h-10 flex items-center justify-center bg-red-100 rounded-full hover:bg-red-200 transition-colors"
-                            >
-                                <i className="ri-logout-box-line text-red-600"></i>
-                            </button>
+                            <>
+                                <button
+                                    onClick={onNotificationClick}
+                                    className="w-10 h-10 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
+                                >
+                                    <div className="relative">
+                                        <i className="ri-notification-3-line text-gray-600"></i>
+                                        {unreadCount > 0 && (
+                                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                                                {unreadCount}
+                                            </span>
+                                        )}
+                                    </div>
+                                </button>
+                                <button
+                                    onClick={handleLogout}
+                                    className="w-10 h-10 flex items-center justify-center bg-red-100 rounded-full hover:bg-red-200 transition-colors"
+                                >
+                                    <i className="ri-logout-box-line text-red-600"></i>
+                                </button>
+                            </>
                         ) : (
                             <button
                                 onClick={handleLogin}

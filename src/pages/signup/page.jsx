@@ -11,6 +11,8 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [alertMessage, setAlertMessage] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -58,11 +60,14 @@ export default function SignupPage() {
 
         {/* 로고 또는 앱 이름 */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-blue-600" style={{ fontFamily: "'Pacifico', cursive" }}>
-            CPU
-          </h1>
-          <p className="text-gray-600 mt-2">
-            새로운 성장의 기회를 만들어보세요
+          <img
+              src="/logo.png"
+              alt="로고"
+              className="mx-auto w-full h-auto max-w-[120px] sm:max-w-[160px] md:max-w-[200px]"
+          />
+          <p className="mt-2 text-base text-gray-600 tracking-tight">CPU 활동 관리 시스템</p>
+          <p className="mt-4 text-xl font-bold text-gray-800">
+            회원가입
           </p>
         </div>
 
@@ -115,12 +120,19 @@ export default function SignupPage() {
                 </span>
                 <input
                   id="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="6자 이상 입력하세요"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3"
+                >
+                  <i className={showPassword ? "ri-eye-off-line text-gray-400" : "ri-eye-line text-gray-400"}></i>
+                </button>
               </div>
             </div>
 
@@ -133,12 +145,19 @@ export default function SignupPage() {
                 </span>
                 <input
                   id="confirmPassword"
-                  type="password"
+                  type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="비밀번호를 다시 한번 입력하세요"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3"
+                >
+                  <i className={showConfirmPassword ? "ri-eye-off-line text-gray-400" : "ri-eye-line text-gray-400"}></i>
+                </button>
               </div>
             </div>
 
