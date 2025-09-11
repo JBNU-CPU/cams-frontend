@@ -3,6 +3,7 @@ import { logout } from '../../store/authSlice';
 import { useDispatch } from 'react-redux';
 import Alert from './Alert';
 import ConfirmDialog from './ConfirmDialog';
+import { useState } from 'react';
 
 
 export default function Header({ title, unreadCount, isLoggedIn, onNotificationClick, children }) {
@@ -50,6 +51,7 @@ export default function Header({ title, unreadCount, isLoggedIn, onNotificationC
             {/* ✅ ConfirmDialog */}
             {showConfirm && (
                 <ConfirmDialog
+                    open={showConfirm}
                     message="로그아웃 하시겠습니까?"
                     onConfirm={confirmLogout}
                     onCancel={cancelLogout}
