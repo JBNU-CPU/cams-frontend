@@ -4,7 +4,7 @@ import { logout } from "../store/authSlice";
 
 // const BASE_URL = 'http://localhost:8080';
 const BASE_URL = "https://jbnucpu.co.kr/api";
-// const BASE_URL = "https://jbnucpu.co.kr/test";
+// const BASE_URL = "https://jbnucpu.co.kr/api-test";
 
 export const axiosInstance = axios.create({
   baseURL: BASE_URL,
@@ -55,13 +55,16 @@ axiosInstance.interceptors.response.use(
 
     const { status } = error.response;
 
+    const authPaths = ["/login", "/signup", "/logout"];
+    const isAuthCall = authPaths.some((p) => originalRequest.url?.endsWith(p));
+
     // /reissue 자체 실패면 즉시 로그아웃
     const isReissueCall =
       originalRequest.url?.endsWith("/reissue") ||
       originalRequest.url === "/reissue" ||
       originalRequest.__isReissue === true;
 
-    if ((status === 401 || status === 403) && !isReissueCall) {
+    if ((status === 401 || status === 403) && !isReissueCall && !isAuthCall) {
       // 이미 재시도한 요청(무한루프 방지)
       if (originalRequest._retry) {
         return Promise.reject(error);
@@ -119,7 +122,7 @@ axiosInstance.interceptors.response.use(
     }
 
     // 재발급 자체가 401이면 로그아웃
-    if ((status === 401 || status === 403) && isReissueCall) {
+    if ((status === 401 || status === 403) && isReissueCall && !isAuthCall) {
       localStorage.removeItem("accessToken");
       try {
         console.log("무제발생!!");
