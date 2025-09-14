@@ -1,12 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
 import axiosInstance from "../../api/axiosInstance";
 import Alert from "../../components/common/Alert";
 
-const publicAxios = axios.create({
-  baseURL: "https://jbnucpu.co.kr/api-test",
-});
 
 export default function SignupPage() {
   const navigate = useNavigate();
@@ -45,7 +41,7 @@ export default function SignupPage() {
     }
 
     try {
-      await publicAxios.get(`/api/member/check-username?username=${studentId}`);
+      await axiosInstance.get(`/api/member/check-username?username=${studentId}`);
       setStudentIdStatus({ message: "사용 가능한 학번입니다.", type: "success" });
     } catch (error) {
       if (error.response && error.response.status === 400) {
@@ -65,7 +61,7 @@ export default function SignupPage() {
     setVerificationError("");
     try {
       // 1. 이메일 중복 확인
-      await publicAxios.get(`/api/member/check-email?email=${email}`);
+      await axiosInstance.get(`/api/member/check-email?email=${email}`);
 
       // 2. 중복이 아닐 경우 인증 코드 전송
       try {
@@ -318,9 +314,8 @@ export default function SignupPage() {
                 />
               </div>
               {studentIdStatus.message && (
-                <p className={`mt-2 text-sm ${
-                  studentIdStatus.type === 'error' ? 'text-red-500' : 'text-green-600'
-                }`}>
+                <p className={`mt-2 text-sm ${studentIdStatus.type === 'error' ? 'text-red-500' : 'text-green-600'
+                  }`}>
                   {studentIdStatus.message}
                 </p>
               )}
@@ -411,11 +406,10 @@ export default function SignupPage() {
               <button
                 type="submit"
                 disabled={!isEmailVerified}
-                className={`w-full py-3 text-white rounded-lg font-semibold text-lg transition-colors ${
-                  isEmailVerified
-                    ? "bg-blue-600 hover:bg-blue-700"
-                    : "bg-gray-400 cursor-not-allowed"
-                }`}
+                className={`w-full py-3 text-white rounded-lg font-semibold text-lg transition-colors ${isEmailVerified
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-gray-400 cursor-not-allowed"
+                  }`}
               >
                 가입하기
               </button>
