@@ -1,12 +1,18 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import axios from "axios";
 import axiosInstance from "../../api/axiosInstance";
 import Alert from "../../components/common/Alert";
+
+const publicAxios = axios.create({
+  baseURL: "https://jbnucpu.co.kr/api-test",
+});
 
 export default function SignupPage() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
-  const [studentId, setStudentId] = useState(""); // email state를 studentId로 변경
+  const [email, setEmail] = useState("");
+  const [studentId, setStudentId] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -14,13 +20,113 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // 이메일 인증 관련 state
+  const [emailVerificationSent, setEmailVerificationSent] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [verificationError, setVerificationError] = useState("");
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [studentIdStatus, setStudentIdStatus] = useState({ message: "", type: "" });
+
+  const handleCheckStudentId = async () => {
+    if (!studentId) {
+      setStudentIdStatus({ message: "", type: "" });
+      return;
+    }
+
+    // 학번 형식 검사 (9자리 숫자)
+    const studentIdRegex = /^\d{9}$/;
+    if (!studentIdRegex.test(studentId)) {
+      setStudentIdStatus({
+        message: "학번은 9자리 숫자로 입력해주세요.",
+        type: "error",
+      });
+      return;
+    }
+
+    try {
+      await publicAxios.get(`/api/member/check-username?username=${studentId}`);
+      setStudentIdStatus({ message: "사용 가능한 학번입니다.", type: "success" });
+    } catch (error) {
+      if (error.response && error.response.status === 400) {
+        setStudentIdStatus({ message: "이미 사용 중인 학번입니다.", type: "error" });
+      } else {
+        setStudentIdStatus({ message: "학번 확인 중 오류가 발생했습니다.", type: "error" });
+      }
+    }
+  };
+
+  const handleSendVerificationCode = async () => {
+    if (!email) {
+      setEmailError("이메일을 입력해주세요.");
+      return;
+    }
+    setEmailError("");
+    setVerificationError("");
+    try {
+      // 1. 이메일 중복 확인
+      await publicAxios.get(`/api/member/check-email?email=${email}`);
+
+      // 2. 중복이 아닐 경우 인증 코드 전송
+      try {
+        await axiosInstance.get(`/api/member/email/auth?email=${email}`);
+        setEmailVerificationSent(true);
+        setAlertMessage("인증 코드가 전송되었습니다. 이메일을 확인해주세요.");
+      } catch (error) {
+        setEmailError(
+          "인증 코드 전송에 실패했습니다. 잠시 후 다시 시도해주세요."
+        );
+        console.error("Email verification sending error:", error);
+      }
+    } catch (error) {
+      if (error.response && error.response.status === 400) {
+        setEmailError("이미 가입된 이메일입니다.");
+      } else {
+        setEmailError(
+          "알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+        );
+      }
+      console.error("Email duplication check error:", error);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (!verificationCode) {
+      setVerificationError("인증 코드를 입력해주세요.");
+      return;
+    }
+    setEmailError("");
+    setVerificationError("");
+    try {
+      await axiosInstance.post("/api/member/email/auth", null, {
+        params: {
+          email: email,
+          auth: verificationCode,
+        },
+      });
+      setIsEmailVerified(true);
+      setAlertMessage("이메일 인증이 완료되었습니다.");
+    } catch (error) {
+      setVerificationError("인증 코드가 올바르지 않거나 만료되었습니다.");
+      console.error("Email verification code error:", error);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(""); // 이전 에러 메시지 초기화
 
-    // 1. 입력 값 유효성 검사 (studentId로 변경)
-    if (!name || !studentId || !password || !confirmPassword) {
+    // 1. 입력 값 유효성 검사
+    if (!name || !email || !studentId || !password || !confirmPassword) {
       setError("모든 필드를 입력해주세요.");
+      return;
+    }
+    if (studentIdStatus.type === 'error') {
+      setError("학번 중복 확인이 되지 않았습니다.");
+      return;
+    }
+    if (!isEmailVerified) {
+      setError("이메일 인증을 완료해주세요.");
       return;
     }
     if (password !== confirmPassword) {
@@ -32,24 +138,30 @@ export default function SignupPage() {
       return;
     }
 
-    // 2. 실제 회원가입 로직 (studentId로 변경)
-    console.log("회원가입 정보:", { name, studentId, password });
+    // 2. 실제 회원가입 로직
+    console.log("회원가입 정보:", {
+      name,
+      email,
+      studentId,
+      password,
+      verificationCode,
+    });
 
     const requestBody = {
       name: name,
+      email: email,
       username: studentId,
       password: password,
+      // TODO: 인증 코드도 함께 보내야 할 수 있음
     };
 
     try {
-      let response = await axiosInstance.post("/api/member", requestBody);
-      console.log(response.data);
-      setAlertMessage("프로필이 성공적으로 저장되었습니다.");
-      setTimeout(() => navigate("/"), 500);
+      await axiosInstance.post("/api/member", requestBody);
+      setAlertMessage("회원가입이 성공적으로 완료되었습니다.");
+      setTimeout(() => navigate("/login"), 500);
     } catch (error) {
-      console.error("프로필 업데이트 실패:", error);
-      setAlertMessage(`오류 발생! 이미 가입된 회원입니다.`);
-      // todo: 바꿔야함 일단 가입된 회원이라고 한다
+      console.error("회원가입 실패:", error);
+      setAlertMessage(`오류 발생! 이미 가입된 회원이거나 서버 오류입니다.`);
     }
   };
 
@@ -98,6 +210,88 @@ export default function SignupPage() {
               </div>
             </div>
 
+            {/* 이메일 입력 필드 */}
+            <div>
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                이메일
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                  <i className="ri-mail-line text-gray-400"></i>
+                </span>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="이메일을 입력하세요"
+                  className="w-full pl-10 pr-24 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  readOnly={isEmailVerified || emailVerificationSent}
+                />
+                {email && !isEmailVerified && (
+                  <button
+                    type="button"
+                    onClick={handleSendVerificationCode}
+                    className="absolute inset-y-0 right-0 my-1.5 mr-1.5 py-2 px-3 bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300 transition-colors"
+                  >
+                    {emailVerificationSent ? "재전송" : "인증"}
+                  </button>
+                )}
+              </div>
+              {emailError && (
+                <p className="mt-2 text-sm text-red-500">{emailError}</p>
+              )}
+              {emailVerificationSent && (
+                <>
+                  {!isEmailVerified ? (
+                    <div className="mt-4">
+                      <label
+                        htmlFor="verificationCode"
+                        className="block text-sm font-medium text-gray-700 mb-2"
+                      >
+                        인증 코드
+                      </label>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                          <i className="ri-shield-check-line text-gray-400"></i>
+                        </span>
+                        <input
+                          id="verificationCode"
+                          type="text"
+                          value={verificationCode}
+                          onChange={(e) => setVerificationCode(e.target.value)}
+                          placeholder="코드를 입력하세요"
+                          className="w-full pl-10 pr-24 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        {verificationCode && (
+                          <button
+                            type="button"
+                            onClick={handleVerifyCode}
+                            className="absolute inset-y-0 right-0 my-1.5 mr-1.5 py-2 px-3 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 transition-colors"
+                          >
+                            인증하기
+                          </button>
+                        )}
+                      </div>
+                      {verificationError && (
+                        <p className="mt-2 text-sm text-red-500">
+                          {verificationError}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-sm text-green-600 font-semibold">
+                      <i className="ri-checkbox-circle-line align-middle mr-1"></i>
+                      이메일 인증이 완료되었습니다.
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+
             {/* 학번 입력 필드 (수정된 부분) */}
             <div>
               <label
@@ -108,17 +302,28 @@ export default function SignupPage() {
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                  <i className="ri-mail-line text-gray-400"></i>
+                  <i className="ri-book-read-line text-gray-400"></i>
                 </span>
                 <input
                   id="studentId"
                   type="text"
                   value={studentId}
-                  onChange={(e) => setStudentId(e.target.value)}
+                  onChange={(e) => {
+                    setStudentId(e.target.value);
+                    setStudentIdStatus({ message: "", type: "" });
+                  }}
+                  onBlur={handleCheckStudentId}
                   placeholder="학번을 입력하세요"
                   className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+              {studentIdStatus.message && (
+                <p className={`mt-2 text-sm ${
+                  studentIdStatus.type === 'error' ? 'text-red-500' : 'text-green-600'
+                }`}>
+                  {studentIdStatus.message}
+                </p>
+              )}
             </div>
 
             {/* 비밀번호 입력 필드 */}
@@ -205,7 +410,12 @@ export default function SignupPage() {
             <div>
               <button
                 type="submit"
-                className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold text-lg hover:bg-blue-700 transition-colors"
+                disabled={!isEmailVerified}
+                className={`w-full py-3 text-white rounded-lg font-semibold text-lg transition-colors ${
+                  isEmailVerified
+                    ? "bg-blue-600 hover:bg-blue-700"
+                    : "bg-gray-400 cursor-not-allowed"
+                }`}
               >
                 가입하기
               </button>
