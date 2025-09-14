@@ -126,6 +126,15 @@ export default function LoginPage() {
                 회원가입
               </Link>
             </p>
+            <p className="text-gray-600 mt-2">
+              비밀번호를 잊으셨나요?{" "}
+              <Link
+                to="/find-password"
+                className="font-medium text-blue-600 hover:text-blue-700"
+              >
+                비밀번호 찾기
+              </Link>
+            </p>
           </div>
         </div>
       </div>

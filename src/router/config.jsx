@@ -7,6 +7,7 @@ import ActivityDetail from "../pages/activity-detail/page";
 import LoginPage from "../pages/login/page";
 import SignupPage from "../pages/signup/page";
 import OnboardingPage from "../pages/onboarding/page";
+import FindPasswordPage from "../pages/find-password/page";
 
 const routes = [
   {
@@ -44,6 +45,10 @@ const routes = [
   {
     path: "/onboarding",
     element: <OnboardingPage />
+  },
+  {
+    path: "/find-password",
+    element: <FindPasswordPage />
   },
   {
     path: "*",
