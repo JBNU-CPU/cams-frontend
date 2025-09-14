@@ -658,7 +658,7 @@ export default function ActivityManagement() {
                 <Alert message={alertMessage} onClose={() => setAlertMessage(null)} />
             )}
             {(() => {
-                const displayActivities = activityData.filter(activity => activity.isApproved && activity.activityStatus === 'STARTED');
+                const displayActivities = activityData.filter(activity => activity.isApproved && (activity.activityStatus === 'STARTED' || activity.activityStatus === 'ENDED'));
                 if (displayActivities.length === 0) {
                     return (
                         <div className="bg-white rounded-xl p-6 text-center">
