@@ -152,7 +152,7 @@ export default function MyPage() {
         setUserProfile({
           name: profileData.name || "이름 없음",
           email: profileData.email || "-",
-          phone: profileData.phone || "-",
+          phone: profileData.phone || "",
           major: profileData.department || "학과 정보 없음",
           grade: profileData.cohort
             ? `${profileData.cohort}기`
@@ -462,8 +462,16 @@ export default function MyPage() {
     setEditForm({ ...editForm, phone: formattedPhone });
   };
 
+  const handleGradeChange = (e) => {
+    const onlyNumbers = e.target.value.replace(/\D/g, "");
+    setEditForm({ ...editForm, grade: onlyNumbers });
+  };
+
   const handleOpenProfileEdit = () => {
-    setEditForm(userProfile);
+    setEditForm({
+      ...userProfile,
+      grade: userProfile.grade.replace(/\D/g, ""),
+    });
     setShowProfileEditModal(true);
   };
 
@@ -483,7 +491,10 @@ export default function MyPage() {
 
     try {
       await axiosInstance.put("/api/member/me", requestBody);
-      setUserProfile(editForm); // 상태 업데이트
+      setUserProfile({
+        ...editForm,
+        grade: isNaN(cohortNumber) ? "0 기" : `${cohortNumber}기`,
+      }); // 상태 업데이트
       setShowProfileEditModal(false); // 모달 닫기
       alert("프로필이 성공적으로 저장되었습니다.");
     } catch (error) {
@@ -1506,10 +1517,8 @@ export default function MyPage() {
                   <input
                     type="text"
                     value={editForm.grade}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, grade: e.target.value })
-                    }
-                    placeholder="예: 10기"
+                    onChange={handleGradeChange}
+                    placeholder="예: 10"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
