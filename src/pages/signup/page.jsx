@@ -22,6 +22,8 @@ export default function SignupPage() {
   const [emailError, setEmailError] = useState("");
   const [verificationError, setVerificationError] = useState("");
   const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [isSendingVerification, setIsSendingVerification] = useState(false);
+  const [emailInfoMessage, setEmailInfoMessage] = useState("");
   const [studentIdStatus, setStudentIdStatus] = useState({ message: "", type: "" });
 
   const handleCheckStudentId = async () => {
@@ -59,6 +61,8 @@ export default function SignupPage() {
     }
     setEmailError("");
     setVerificationError("");
+    setEmailInfoMessage("");
+    setIsSendingVerification(true);
     try {
       // 1. 이메일 중복 확인
       await axiosInstance.get(`/api/member/check-email?email=${email}`);
@@ -67,7 +71,7 @@ export default function SignupPage() {
       try {
         await axiosInstance.get(`/api/member/email/auth?email=${email}`);
         setEmailVerificationSent(true);
-        setAlertMessage("인증 코드가 전송되었습니다. 이메일을 확인해주세요.");
+        setEmailInfoMessage("인증 코드가 전송되었습니다. 이메일을 확인해주세요.");
       } catch (error) {
         setEmailError(
           "인증 코드 전송에 실패했습니다. 잠시 후 다시 시도해주세요."
@@ -83,6 +87,8 @@ export default function SignupPage() {
         );
       }
       console.error("Email duplication check error:", error);
+    } finally {
+      setIsSendingVerification(false);
     }
   };
 
@@ -101,7 +107,7 @@ export default function SignupPage() {
         },
       });
       setIsEmailVerified(true);
-      setAlertMessage("이메일 인증이 완료되었습니다.");
+      setEmailInfoMessage(""); // 인증 완료 시 이전 정보 메시지 제거
     } catch (error) {
       setVerificationError("인증 코드가 올바르지 않거나 만료되었습니다.");
       console.error("Email verification code error:", error);
@@ -222,7 +228,11 @@ export default function SignupPage() {
                   id="email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setEmailError("");
+                    setEmailInfoMessage("");
+                  }}
                   placeholder="이메일을 입력하세요"
                   className="w-full pl-10 pr-24 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   readOnly={isEmailVerified || emailVerificationSent}
@@ -231,60 +241,65 @@ export default function SignupPage() {
                   <button
                     type="button"
                     onClick={handleSendVerificationCode}
-                    className="absolute inset-y-0 right-0 my-1.5 mr-1.5 py-2 px-3 bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300 transition-colors"
+                    disabled={isSendingVerification}
+                    className="absolute inset-y-0 right-0 my-1.5 mr-1.5 py-2 px-3 bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-wait"
                   >
-                    {emailVerificationSent ? "재전송" : "인증"}
+                    {isSendingVerification
+                      ? "전송 중..."
+                      : emailVerificationSent
+                      ? "재전송"
+                      : "인증"}
                   </button>
                 )}
               </div>
               {emailError && (
                 <p className="mt-2 text-sm text-red-500">{emailError}</p>
               )}
-              {emailVerificationSent && (
-                <>
-                  {!isEmailVerified ? (
-                    <div className="mt-4">
-                      <label
-                        htmlFor="verificationCode"
-                        className="block text-sm font-medium text-gray-700 mb-2"
+              {emailInfoMessage && !isEmailVerified && (
+                <p className="mt-2 text-sm text-gray-600">{emailInfoMessage}</p>
+              )}
+              {emailVerificationSent && !isEmailVerified && (
+                <div className="mt-4">
+                  <label
+                    htmlFor="verificationCode"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
+                    인증 코드
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                      <i className="ri-shield-check-line text-gray-400"></i>
+                    </span>
+                    <input
+                      id="verificationCode"
+                      type="text"
+                      value={verificationCode}
+                      onChange={(e) => setVerificationCode(e.target.value)}
+                      placeholder="코드를 입력하세요"
+                      className="w-full pl-10 pr-24 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    {verificationCode && (
+                      <button
+                        type="button"
+                        onClick={handleVerifyCode}
+                        className="absolute inset-y-0 right-0 my-1.5 mr-1.5 py-2 px-3 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 transition-colors"
                       >
-                        인증 코드
-                      </label>
-                      <div className="relative">
-                        <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                          <i className="ri-shield-check-line text-gray-400"></i>
-                        </span>
-                        <input
-                          id="verificationCode"
-                          type="text"
-                          value={verificationCode}
-                          onChange={(e) => setVerificationCode(e.target.value)}
-                          placeholder="코드를 입력하세요"
-                          className="w-full pl-10 pr-24 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        {verificationCode && (
-                          <button
-                            type="button"
-                            onClick={handleVerifyCode}
-                            className="absolute inset-y-0 right-0 my-1.5 mr-1.5 py-2 px-3 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 transition-colors"
-                          >
-                            인증하기
-                          </button>
-                        )}
-                      </div>
-                      {verificationError && (
-                        <p className="mt-2 text-sm text-red-500">
-                          {verificationError}
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="mt-4 text-sm text-green-600 font-semibold">
-                      <i className="ri-checkbox-circle-line align-middle mr-1"></i>
-                      이메일 인증이 완료되었습니다.
+                        인증하기
+                      </button>
+                    )}
+                  </div>
+                  {verificationError && (
+                    <p className="mt-2 text-sm text-red-500">
+                      {verificationError}
                     </p>
                   )}
-                </>
+                </div>
+              )}
+              {isEmailVerified && (
+                <p className="mt-4 text-sm text-green-600 font-semibold">
+                  <i className="ri-checkbox-circle-line align-middle mr-1"></i>
+                  이메일 인증이 완료되었습니다.
+                </p>
               )}
             </div>
 
