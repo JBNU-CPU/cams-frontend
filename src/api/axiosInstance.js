@@ -2,7 +2,7 @@
 import axios from "axios";
 import { logout } from "../store/authSlice";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const BASE_URL = "";
 // const BASE_URL = 'http://localhost:8080';
 //const BASE_URL = "https://jbnucpu.co.kr/api";
 // const BASE_URL = "https://jbnucpu.co.kr/api-test";
