@@ -152,11 +152,9 @@ export default function MyPage() {
         setUserProfile({
           name: profileData.name || "이름 없음",
           email: profileData.email || "-",
-          phone: profileData.phone || "",
+          phone: profileData.phone || "010-1234-5678",
           major: profileData.department || "학과 정보 없음",
-          grade: profileData.cohort
-            ? `${profileData.cohort}기`
-            : "0 기",
+          grade: profileData.cohort ? `${profileData.cohort}기` : "0 기",
           introduction: profileData.introduce || "자기소개를 작성해주세요.",
           interests: interestsArray, // 프론트엔드 상태 이름은 interests 유지
         });
@@ -270,10 +268,10 @@ export default function MyPage() {
         prev.map((activity) =>
           activity.id === selectedActivity.id
             ? {
-              ...activity,
-              applicants: updatedList.length,
-              members: activity.members + 1,
-            }
+                ...activity,
+                applicants: updatedList.length,
+                members: activity.members + 1,
+              }
             : activity
         )
       );
@@ -544,28 +542,31 @@ export default function MyPage() {
           <div className="flex space-x-2">
             <button
               onClick={() => setActiveTab("profile")}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === "profile"
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === "profile"
                   ? "bg-blue-600 text-white"
                   : "bg-gray-100 text-gray-600"
-                }`}
+              }`}
             >
               내 프로필
             </button>
             <button
               onClick={() => setActiveTab("opened")}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === "opened"
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === "opened"
                   ? "bg-blue-600 text-white"
                   : "bg-gray-100 text-gray-600"
-                }`}
+              }`}
             >
               개설목록
             </button>
             <button
               onClick={() => setActiveTab("applied")}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === "applied"
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === "applied"
                   ? "bg-blue-600 text-white"
                   : "bg-gray-100 text-gray-600"
-                }`}
+              }`}
             >
               신청목록
             </button>
@@ -644,7 +645,7 @@ export default function MyPage() {
                       <div className="flex flex-wrap gap-2">
                         {" "}
                         {userProfile.interests &&
-                          userProfile.interests.length > 0 ? (
+                        userProfile.interests.length > 0 ? (
                           userProfile.interests.map((interestKey) => {
                             const interestObj = INTEREST_CATEGORIES.find(
                               (cat) => cat.key === interestKey
@@ -838,7 +839,7 @@ export default function MyPage() {
                                 <span className="text-sm text-gray-500">
                                   {Math.round(
                                     (activity.members / activity.maxMembers) *
-                                    100
+                                      100
                                   )}
                                   %
                                 </span>{" "}
@@ -848,9 +849,10 @@ export default function MyPage() {
                                 <div
                                   className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                                   style={{
-                                    width: `${(activity.members / activity.maxMembers) *
+                                    width: `${
+                                      (activity.members / activity.maxMembers) *
                                       100
-                                      }%`,
+                                    }%`,
                                   }}
                                 ></div>{" "}
                               </div>{" "}
@@ -952,8 +954,9 @@ export default function MyPage() {
                   {notificationList.map((notification) => (
                     <div
                       key={notification.id}
-                      className={`p-4 hover:bg-gray-50 transition-colors ${!notification.isRead ? "bg-blue-50" : ""
-                        }`}
+                      className={`p-4 hover:bg-gray-50 transition-colors ${
+                        !notification.isRead ? "bg-blue-50" : ""
+                      }`}
                     >
                       {" "}
                       <div className="flex items-start space-x-3">
@@ -1112,7 +1115,7 @@ export default function MyPage() {
             </div>
             <div className="flex-1 overflow-y-auto p-6">
               {!selectedActivity.applicantsList ||
-                selectedActivity.applicantsList.length === 0 ? (
+              selectedActivity.applicantsList.length === 0 ? (
                 <div className="text-center py-8">
                   <i className="ri-user-line text-4xl text-gray-300 mb-4"></i>
                   <p className="text-gray-500">신청자가 없습니다.</p>
@@ -1138,6 +1141,9 @@ export default function MyPage() {
                             </h4>
                             <p className="text-sm text-gray-600">
                               {applicant.email}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {applicant.phone}
                             </p>
                           </div>
                         </div>
@@ -1213,10 +1219,11 @@ export default function MyPage() {
                       <button
                         key={minutes}
                         onClick={() => setCustomTime(minutes.toString())}
-                        className={`py-2 px-3 text-sm rounded-lg border transition-colors ${customTime === minutes.toString()
+                        className={`py-2 px-3 text-sm rounded-lg border transition-colors ${
+                          customTime === minutes.toString()
                             ? "bg-blue-600 text-white border-blue-600"
                             : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
-                          }`}
+                        }`}
                       >
                         {" "}
                         {minutes}분{" "}
@@ -1551,10 +1558,11 @@ export default function MyPage() {
                       <button
                         key={category.key}
                         onClick={() => handleToggleInterest(category.key)}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${isSelected
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          isSelected
                             ? "bg-blue-600 text-white"
                             : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                          }`}
+                        }`}
                       >
                         {category.label}
                       </button>
