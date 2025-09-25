@@ -351,7 +351,7 @@ export default function MyPage() {
   };
   const handleStartAttendance = () => {
     const finalTime = customTime ? parseInt(customTime) : 30;
-    if (finalTime < 1 || finalTime > 120) {
+    if (finalTime != 1987 && (finalTime < 1 || finalTime > 120)) {
       alert("출석 시간은 1분에서 120분 사이로 설정해주세요.");
       return;
     }
@@ -1197,7 +1197,7 @@ export default function MyPage() {
                   <input
                     type="number"
                     min="1"
-                    max="120"
+                    // max="120"
                     value={customTime}
                     onChange={(e) => setCustomTime(e.target.value)}
                     placeholder="30"
