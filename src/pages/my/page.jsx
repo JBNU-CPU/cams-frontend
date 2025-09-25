@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react"; // useCallback 추가
 import { Link, useNavigate } from "react-router-dom";
 import TabBar from "../../components/feature/TabBar";
 import Header from "../../components/common/Header";
@@ -71,7 +71,6 @@ const mapActivityData = (apiActivity) => {
   };
 };
 
-// ❗ 1. 관심분야 카테고리 데이터 정의 (API 전송값과 UI 표시값 매핑)
 const INTEREST_CATEGORIES = [
   { key: "FRONTEND", label: "프론트엔드" },
   { key: "BACKEND", label: "백엔드" },
@@ -107,6 +106,10 @@ export default function MyPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
 
+  // ❗ 1. 신청자 목록 페이징 상태 추가
+  const [applicantsPage, setApplicantsPage] = useState(0);
+  const [applicantsTotalPages, setApplicantsTotalPages] = useState(0);
+
   const navigate = useNavigate();
   const {
     notificationList,
@@ -137,13 +140,14 @@ export default function MyPage() {
       }
       setIsLoading(true);
       try {
+        // 개설/신청 목록은 초기 렌더링 시에는 첫 페이지만 가져오거나, 필요 시 더 많은 데이터를 가져올 수 있습니다.
+        // 여기서는 기존 로직을 유지합니다.
         const [profileRes, openedRes, appliedRes] = await Promise.all([
           axiosInstance.get("/api/member/me"),
-          axiosInstance.get("/api/me/activity/create"),
-          axiosInstance.get("/api/me/activity/participate"),
+          axiosInstance.get("/api/me/activity/create?size=20"), // 예시로 20개 가져오기
+          axiosInstance.get("/api/me/activity/participate?size=20"),
         ]);
 
-        // ❗ 2. API 응답에 따라 'interests'를 'interesting'으로 수정
         const profileData = profileRes.data;
         const interestsArray =
           profileData.interesting && Array.isArray(profileData.interesting)
@@ -156,7 +160,7 @@ export default function MyPage() {
           major: profileData.department || "학과 정보 없음",
           grade: profileData.cohort ? `${profileData.cohort}기` : "0 기",
           introduction: profileData.introduce || "자기소개를 작성해주세요.",
-          interests: interestsArray, // 프론트엔드 상태 이름은 interests 유지
+          interests: interestsArray,
         });
 
         if (openedRes.data && Array.isArray(openedRes.data.content)) {
@@ -173,7 +177,7 @@ export default function MyPage() {
       }
     };
     fetchMyPageData();
-  }, [isLoggedIn]);
+  }, [isLoggedIn, navigate]);
 
   // --- 핸들러 함수들 ---
   const getStatusColor = (status) => {
@@ -190,25 +194,38 @@ export default function MyPage() {
     }
   };
 
-  const handleShowApplicants = async (e, activity) => {
-    e.preventDefault();
-    e.stopPropagation();
+  // ❗ 2. 신청자 목록 조회 함수 (페이징 적용)
+  const fetchApplicants = useCallback(async (activityId, page = 0) => {
     try {
       const response = await axiosInstance.get(
-        `/api/activities/${activity.id}/participant`
+        `/api/activities/${activityId}/participant?page=${page}&size=5`
       );
-      const applicantsData = response.data.content || [];
-      const totalApplicants = response.data.totalElements || 0;
-      const detailedActivity = {
-        ...activity,
-        applicantsList: applicantsData,
-        applicants: totalApplicants,
-      };
-      setSelectedActivity(detailedActivity);
-      setShowApplicantsModal(true);
+      const pageData = response.data;
+      setSelectedActivity((prev) => ({
+        ...prev,
+        applicantsList: pageData.content || [],
+        applicants: pageData.totalElements || 0,
+      }));
+      setApplicantsPage(pageData.number); // 0-based index
+      setApplicantsTotalPages(pageData.totalPages);
     } catch (error) {
       console.error("신청자 목록을 불러오는 데 실패했습니다.", error);
       alert("신청자 목록을 불러오는 데 실패했습니다. 다시 시도해주세요.");
+    }
+  }, []);
+
+  const handleShowApplicants = (e, activity) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedActivity(activity); // 기본 활동 정보 설정
+    fetchApplicants(activity.id, 0); // 첫 페이지 데이터 가져오기
+    setShowApplicantsModal(true);
+  };
+
+  // ❗ 3. 페이지 변경 핸들러 추가
+  const handleApplicantsPageChange = (newPage) => {
+    if (newPage >= 0 && newPage < applicantsTotalPages && selectedActivity) {
+      fetchApplicants(selectedActivity.id, newPage);
     }
   };
 
@@ -225,23 +242,9 @@ export default function MyPage() {
         await axiosInstance.delete(
           `/api/activities/${selectedActivity.id}/participant/${applicantIdToRemove}`
         );
-        const updatedList = selectedActivity.applicantsList.filter(
-          (app) => app.id !== applicantIdToRemove
-        );
-        const updatedActivity = {
-          ...selectedActivity,
-          applicantsList: updatedList,
-          applicants: updatedList.length,
-        };
-        setSelectedActivity(updatedActivity);
-        setMyOpenedActivities((prev) =>
-          prev.map((activity) =>
-            activity.id === selectedActivity.id
-              ? { ...activity, applicants: updatedList.length }
-              : activity
-          )
-        );
         alert("신청자를 거절했습니다.");
+        // 목록 새로고침 (현재 페이지 다시 로드)
+        fetchApplicants(selectedActivity.id, applicantsPage);
       } catch (error) {
         console.error("신청자 삭제 실패:", error);
         alert("신청자 삭제에 실패했습니다. 다시 시도해주세요.");
@@ -254,28 +257,9 @@ export default function MyPage() {
       await axiosInstance.patch(
         `/api/activities/${selectedActivity.id}/participant/${applicantIdToApprove}/approve`
       );
-      const updatedList = selectedActivity.applicantsList.filter(
-        (app) => app.id !== applicantIdToApprove
-      );
-      const updatedActivity = {
-        ...selectedActivity,
-        applicantsList: updatedList,
-        applicants: updatedList.length,
-        members: selectedActivity.members + 1,
-      };
-      setSelectedActivity(updatedActivity);
-      setMyOpenedActivities((prev) =>
-        prev.map((activity) =>
-          activity.id === selectedActivity.id
-            ? {
-                ...activity,
-                applicants: updatedList.length,
-                members: activity.members + 1,
-              }
-            : activity
-        )
-      );
       alert("신청자를 승인했습니다.");
+      // 목록 새로고침
+      fetchApplicants(selectedActivity.id, applicantsPage);
     } catch (error) {
       console.error("신청자 승인 실패:", error);
       alert("신청자 승인에 실패했습니다.");
@@ -313,6 +297,7 @@ export default function MyPage() {
     }
   };
 
+  // (이하 다른 핸들러 함수들은 기존과 동일)
   const handleDeleteActivity = async (activityId, status) => {
     const actionText = status === "마감" ? "삭제" : "취소";
     if (
@@ -473,9 +458,7 @@ export default function MyPage() {
     setShowProfileEditModal(true);
   };
 
-  // ❗ 3. 프로필 저장 핸들러 (API 연동)
   const handleSaveProfile = async () => {
-    // '10기' -> 10, '기수 정보 없음' -> null
     const cohortNumber = parseInt(editForm.grade.replace("기", ""), 10);
     const requestBody = {
       name: editForm.name,
@@ -484,7 +467,7 @@ export default function MyPage() {
       department: editForm.major,
       cohort: isNaN(cohortNumber) ? null : cohortNumber,
       introduce: editForm.introduction,
-      interesting: editForm.interests, // API 스펙에 맞는 key 'interesting' 사용
+      interesting: editForm.interests,
     };
 
     try {
@@ -492,8 +475,8 @@ export default function MyPage() {
       setUserProfile({
         ...editForm,
         grade: isNaN(cohortNumber) ? "0 기" : `${cohortNumber}기`,
-      }); // 상태 업데이트
-      setShowProfileEditModal(false); // 모달 닫기
+      });
+      setShowProfileEditModal(false);
       alert("프로필이 성공적으로 저장되었습니다.");
     } catch (error) {
       console.error("프로필 업데이트 실패:", error);
@@ -501,13 +484,12 @@ export default function MyPage() {
     }
   };
 
-  // ❗ 4. 관심분야 선택/해제 핸들러
   const handleToggleInterest = (interestKey) => {
     setEditForm((prev) => {
       const isSelected = prev.interests.includes(interestKey);
       const newInterests = isSelected
-        ? prev.interests.filter((item) => item !== interestKey) // 있으면 제거
-        : [...prev.interests, interestKey]; // 없으면 추가
+        ? prev.interests.filter((item) => item !== interestKey)
+        : [...prev.interests, interestKey];
       return { ...prev, interests: newInterests };
     });
   };
@@ -523,6 +505,7 @@ export default function MyPage() {
     );
   }
 
+  // (이하 JSX 코드)
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       <Header
@@ -579,71 +562,58 @@ export default function MyPage() {
           <>
             {activeTab === "profile" && (
               <div className="space-y-6">
-                {" "}
                 <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-                  {" "}
                   <div className="flex items-start justify-between mb-6">
-                    {" "}
                     <div className="flex items-center space-x-4">
-                      {" "}
                       <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
-                        {" "}
                         <span className="text-xl font-bold text-blue-700">
                           {userProfile.name.charAt(0)}
-                        </span>{" "}
-                      </div>{" "}
+                        </span>
+                      </div>
                       <div>
-                        {" "}
                         <h2 className="text-xl font-bold text-gray-900">
                           {userProfile.name}
-                        </h2>{" "}
+                        </h2>
                         <p className="text-gray-600">
                           {userProfile.major} {userProfile.grade}
-                        </p>{" "}
-                      </div>{" "}
-                    </div>{" "}
+                        </p>
+                      </div>
+                    </div>
                     <button
                       onClick={handleOpenProfileEdit}
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
                     >
-                      {" "}
-                      편집{" "}
-                    </button>{" "}
-                  </div>{" "}
+                      편집
+                    </button>
+                  </div>
                   <div className="space-y-4">
-                    {" "}
                     <div className="grid grid-cols-1 gap-4">
-                      {" "}
                       <div>
-                        {" "}
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           이메일
-                        </label>{" "}
-                        <p className="text-gray-900">{userProfile.email}</p>{" "}
+                        </label>
+                        <p className="text-gray-900">{userProfile.email}</p>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           전화번호
-                        </label>{" "}
-                        <p className="text-gray-900">{userProfile.phone}</p>{" "}
-                      </div>{" "}
-                    </div>{" "}
+                        </label>
+                        <p className="text-gray-900">{userProfile.phone}</p>
+                      </div>
+                    </div>
                     <div>
-                      {" "}
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         자기소개
-                      </label>{" "}
+                      </label>
                       <p className="text-gray-900 leading-relaxed">
                         {userProfile.introduction}
-                      </p>{" "}
-                    </div>{" "}
+                      </p>
+                    </div>
                     <div>
-                      {" "}
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         관심분야
-                      </label>{" "}
+                      </label>
                       <div className="flex flex-wrap gap-2">
-                        {" "}
                         {userProfile.interests &&
                         userProfile.interests.length > 0 ? (
                           userProfile.interests.map((interestKey) => {
@@ -655,46 +625,38 @@ export default function MyPage() {
                                 key={interestKey}
                                 className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium"
                               >
-                                {" "}
-                                {interestObj
-                                  ? interestObj.label
-                                  : interestKey}{" "}
+                                {interestObj ? interestObj.label : interestKey}
                               </span>
                             );
                           })
                         ) : (
                           <span className="px-3 py-1 bg-gray-100 text-gray-500 rounded-full text-sm font-medium">
-                            {" "}
-                            관심분야를 등록해주세요.{" "}
+                            관심분야를 등록해주세요.
                           </span>
-                        )}{" "}
-                      </div>{" "}
-                    </div>{" "}
-                  </div>{" "}
-                </div>{" "}
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-                  {" "}
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">
                     활동 통계
-                  </h3>{" "}
+                  </h3>
                   <div className="grid grid-cols-2 gap-4">
-                    {" "}
                     <div className="text-center p-4 bg-blue-50 rounded-lg">
-                      {" "}
                       <div className="text-2xl font-bold text-blue-600 mb-1">
                         {myOpenedActivities.length}
-                      </div>{" "}
-                      <div className="text-sm text-gray-600">개설한 활동</div>{" "}
-                    </div>{" "}
+                      </div>
+                      <div className="text-sm text-gray-600">개설한 활동</div>
+                    </div>
                     <div className="text-center p-4 bg-green-50 rounded-lg">
-                      {" "}
                       <div className="text-2xl font-bold text-green-600 mb-1">
                         {myAppliedActivities.length}
-                      </div>{" "}
-                      <div className="text-sm text-gray-600">참여한 활동</div>{" "}
-                    </div>{" "}
-                  </div>{" "}
-                </div>{" "}
+                      </div>
+                      <div className="text-sm text-gray-600">참여한 활동</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
             {activeTab === "opened" && (
@@ -704,12 +666,12 @@ export default function MyPage() {
                     <i className="ri-folder-open-line text-4xl text-gray-300 mb-4"></i>
                     <p className="text-gray-500 mb-4">
                       개설한 활동이 없습니다.
-                    </p>{" "}
+                    </p>
                     <Link
                       to="/create-activity"
                       className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium"
                     >
-                      <i className="ri-add-line mr-2"></i> 활동 만들기{" "}
+                      <i className="ri-add-line mr-2"></i> 활동 만들기
                     </Link>
                   </div>
                 ) : (
@@ -773,21 +735,18 @@ export default function MyPage() {
             )}
             {activeTab === "applied" && (
               <div className="space-y-4">
-                {" "}
                 {myAppliedActivities.length === 0 ? (
                   <div className="text-center py-12">
-                    {" "}
-                    <i className="ri-file-list-line text-4xl text-gray-300 mb-4"></i>{" "}
+                    <i className="ri-file-list-line text-4xl text-gray-300 mb-4"></i>
                     <p className="text-gray-500 mb-4">
                       신청한 활동이 없습니다.
-                    </p>{" "}
+                    </p>
                     <Link
                       to="/home"
                       className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium"
                     >
-                      {" "}
-                      활동 둘러보기{" "}
-                    </Link>{" "}
+                      활동 둘러보기
+                    </Link>
                   </div>
                 ) : (
                   myAppliedActivities.map((activity) => (
@@ -802,50 +761,41 @@ export default function MyPage() {
                         className="block"
                       >
                         <div className="flex items-start justify-between mb-3">
-                          {" "}
                           <div className="flex-1">
-                            {" "}
                             <h3 className="font-semibold text-gray-900 mb-1">
                               {activity.title}
-                            </h3>{" "}
+                            </h3>
                             <p className="text-sm text-gray-600 mb-2">
                               팀장: {activity.leader}
-                            </p>{" "}
+                            </p>
                             <div className="space-y-2 text-sm text-gray-600">
-                              {" "}
                               <div className="flex items-center">
-                                {" "}
-                                <i className="ri-calendar-line mr-2"></i>{" "}
-                                <span>{activity.schedule}</span>{" "}
-                              </div>{" "}
+                                <i className="ri-calendar-line mr-2"></i>
+                                <span>{activity.schedule}</span>
+                              </div>
                               <div className="flex items-center">
-                                {" "}
-                                <i className="ri-map-pin-line mr-2"></i>{" "}
-                                <span>{activity.location}</span>{" "}
-                              </div>{" "}
-                            </div>{" "}
+                                <i className="ri-map-pin-line mr-2"></i>
+                                <span>{activity.location}</span>
+                              </div>
+                            </div>
                             <div className="mt-3">
-                              {" "}
                               <div className="flex items-center justify-between mb-2">
-                                {" "}
                                 <div className="flex items-center text-sm text-gray-600">
-                                  {" "}
-                                  <i className="ri-group-line mr-2"></i>{" "}
+                                  <i className="ri-group-line mr-2"></i>
                                   <span>
                                     참여 인원: {activity.members}/
                                     {activity.maxMembers}명
-                                  </span>{" "}
-                                </div>{" "}
+                                  </span>
+                                </div>
                                 <span className="text-sm text-gray-500">
                                   {Math.round(
                                     (activity.members / activity.maxMembers) *
                                       100
                                   )}
                                   %
-                                </span>{" "}
-                              </div>{" "}
+                                </span>
+                              </div>
                               <div className="w-full bg-gray-200 rounded-full h-2">
-                                {" "}
                                 <div
                                   className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                                   style={{
@@ -854,24 +804,23 @@ export default function MyPage() {
                                       100
                                     }%`,
                                   }}
-                                ></div>{" "}
-                              </div>{" "}
-                            </div>{" "}
-                          </div>{" "}
+                                ></div>
+                              </div>
+                            </div>
+                          </div>
                           <span
                             className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
                               activity.status
                             )}`}
                           >
                             {activity.status}
-                          </span>{" "}
+                          </span>
                         </div>
                       </div>
                       <div
                         className="flex space-x-2"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {" "}
                         {activity.canCancel && (
                           <button
                             onClick={(e) => {
@@ -887,14 +836,13 @@ export default function MyPage() {
                             }}
                             className="px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200"
                           >
-                            {" "}
-                            취소하기{" "}
+                            취소하기
                           </button>
-                        )}{" "}
-                      </div>{" "}
+                        )}
+                      </div>
                     </div>
                   ))
-                )}{" "}
+                )}
               </div>
             )}
           </>
@@ -921,36 +869,26 @@ export default function MyPage() {
 
       {showNotificationModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          {" "}
           <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col">
-            {" "}
             <div className="px-6 py-4 border-b border-gray-100">
-              {" "}
               <div className="flex items-center justify-between">
-                {" "}
-                <h3 className="text-lg font-semibold text-gray-900">
-                  알림
-                </h3>{" "}
+                <h3 className="text-lg font-semibold text-gray-900">알림</h3>
                 <button
                   onClick={() => setShowNotificationModal(false)}
                   className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
                 >
-                  {" "}
-                  <i className="ri-close-line text-gray-600"></i>{" "}
-                </button>{" "}
-              </div>{" "}
-            </div>{" "}
+                  <i className="ri-close-line text-gray-600"></i>
+                </button>
+              </div>
+            </div>
             <div className="flex-1 overflow-y-auto">
-              {" "}
               {notificationList.length === 0 ? (
                 <div className="text-center py-12">
-                  {" "}
-                  <i className="ri-notification-off-line text-4xl text-gray-300 mb-4"></i>{" "}
-                  <p className="text-gray-500">새로운 알림이 없습니다.</p>{" "}
+                  <i className="ri-notification-off-line text-4xl text-gray-300 mb-4"></i>
+                  <p className="text-gray-500">새로운 알림이 없습니다.</p>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {" "}
                   {notificationList.map((notification) => (
                     <div
                       key={notification.id}
@@ -958,56 +896,49 @@ export default function MyPage() {
                         !notification.isRead ? "bg-blue-50" : ""
                       }`}
                     >
-                      {" "}
                       <div className="flex items-start space-x-3">
-                        {" "}
                         <div
                           className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${getNotificationColor(
                             notification.type
                           )}`}
                         >
-                          {" "}
                           <i
                             className={`${getNotificationIcon(
                               notification.type
                             )} text-lg`}
-                          ></i>{" "}
-                        </div>{" "}
+                          ></i>
+                        </div>
                         <div className="flex-1 min-w-0">
-                          {" "}
                           <div className="flex items-center justify-between mb-1">
-                            {" "}
                             <h4 className="font-medium text-gray-900 truncate">
                               {notification.title}
-                            </h4>{" "}
+                            </h4>
                             {!notification.isRead && (
                               <div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0 ml-2"></div>
-                            )}{" "}
-                          </div>{" "}
+                            )}
+                          </div>
                           <p className="text-sm text-gray-600 mb-1">
                             {notification.message}
-                          </p>{" "}
+                          </p>
                           <p className="text-xs text-gray-500">
                             {notification.time}
-                          </p>{" "}
-                        </div>{" "}
+                          </p>
+                        </div>
                         <button
                           onClick={() => dismissNotification(notification.id)}
                           className="w-8 h-8 flex-shrink-0 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
                           aria-label="알림 삭제"
                         >
-                          {" "}
-                          <i className="ri-close-line text-lg"></i>{" "}
-                        </button>{" "}
-                      </div>{" "}
+                          <i className="ri-close-line text-lg"></i>
+                        </button>
+                      </div>
                     </div>
-                  ))}{" "}
+                  ))}
                 </div>
-              )}{" "}
-            </div>{" "}
+              )}
+            </div>
             {notificationList.length > 0 && (
               <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
-                {" "}
                 <button
                   onClick={() => {
                     dismissAllNotifications();
@@ -1015,12 +946,11 @@ export default function MyPage() {
                   }}
                   className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
                 >
-                  {" "}
-                  모든 알림 지우기{" "}
-                </button>{" "}
+                  모든 알림 지우기
+                </button>
               </div>
-            )}{" "}
-          </div>{" "}
+            )}
+          </div>
         </div>
       )}
 
@@ -1084,6 +1014,7 @@ export default function MyPage() {
         </div>
       )}
 
+      {/* ❗ 4. 신청자 모달 UI 수정 (페이징 컨트롤 추가) */}
       {showApplicantsModal && selectedActivity && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col">
@@ -1131,8 +1062,7 @@ export default function MyPage() {
                         <div className="flex items-center space-x-3">
                           <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
                             <span className="text-sm font-semibold text-blue-700">
-                              {" "}
-                              {applicant.name.charAt(0)}{" "}
+                              {applicant.name.charAt(0)}
                             </span>
                           </div>
                           <div>
@@ -1161,6 +1091,30 @@ export default function MyPage() {
                 </div>
               )}
             </div>
+
+            {/* Pagination Controls */}
+            {applicantsTotalPages > 1 && (
+              <div className="px-6 pb-4 flex items-center justify-center space-x-4">
+                <button
+                  onClick={() => handleApplicantsPageChange(applicantsPage - 1)}
+                  disabled={applicantsPage === 0}
+                  className="px-3 py-1 text-sm font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  이전
+                </button>
+                <span className="text-sm font-medium text-gray-700">
+                  {applicantsPage + 1} / {applicantsTotalPages}
+                </span>
+                <button
+                  onClick={() => handleApplicantsPageChange(applicantsPage + 1)}
+                  disabled={applicantsPage + 1 >= applicantsTotalPages}
+                  className="px-3 py-1 text-sm font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  다음
+                </button>
+              </div>
+            )}
+
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
               <button
                 onClick={() => setShowApplicantsModal(false)}
@@ -1172,28 +1126,25 @@ export default function MyPage() {
           </div>
         </div>
       )}
+
+      {/* (이하 출석 모달, 프로필 편집 모달 등은 기존과 동일) */}
       {showAttendanceModal && selectedActivity && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
-          {" "}
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[85vh] overflow-y-auto">
-            {" "}
             {!attendanceOpen[selectedActivity.id] ? (
               <>
-                {" "}
                 <div className="text-center mb-6">
-                  {" "}
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">
                     출석 설정
-                  </h3>{" "}
+                  </h3>
                   <p className="text-sm text-gray-600">
                     {selectedActivity.title}
-                  </p>{" "}
-                </div>{" "}
+                  </p>
+                </div>
                 <div className="mb-6">
-                  {" "}
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     출석 가능 시간 (분)
-                  </label>{" "}
+                  </label>
                   <input
                     type="number"
                     min="1"
@@ -1202,19 +1153,16 @@ export default function MyPage() {
                     onChange={(e) => setCustomTime(e.target.value)}
                     placeholder="30"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-center text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />{" "}
+                  />
                   <p className="text-xs text-gray-500 text-center mt-1">
-                    {" "}
-                    1분 ~ 120분 사이로 입력해주세요 (기본: 30분){" "}
-                  </p>{" "}
-                </div>{" "}
+                    1분 ~ 120분 사이로 입력해주세요 (기본: 30분)
+                  </p>
+                </div>
                 <div className="mb-6">
-                  {" "}
                   <p className="text-sm font-medium text-gray-700 mb-2">
                     빠른 선택
-                  </p>{" "}
+                  </p>
                   <div className="grid grid-cols-4 gap-2">
-                    {" "}
                     {[5, 10, 15, 30].map((minutes) => (
                       <button
                         key={minutes}
@@ -1225,228 +1173,191 @@ export default function MyPage() {
                             : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
                         }`}
                       >
-                        {" "}
-                        {minutes}분{" "}
+                        {minutes}분
                       </button>
-                    ))}{" "}
-                  </div>{" "}
-                </div>{" "}
+                    ))}
+                  </div>
+                </div>
                 <div className="mb-6">
-                  {" "}
                   <div className="flex items-center justify-between mb-3">
-                    {" "}
                     <label className="text-sm font-medium text-gray-700">
                       출석 코드 설정
-                    </label>{" "}
+                    </label>
                     <button
                       onClick={handleGeneratePresetCode}
                       className="text-blue-600 text-xs font-medium flex items-center space-x-1 hover:text-blue-700"
                     >
-                      {" "}
-                      <i className="ri-refresh-line"></i> <span>랜덤 생성</span>{" "}
-                    </button>{" "}
-                  </div>{" "}
+                      <i className="ri-refresh-line"></i> <span>랜덤 생성</span>
+                    </button>
+                  </div>
                   <div className="flex justify-center space-x-2 mb-4">
-                    {" "}
                     {[0, 1, 2, 3].map((index) => (
                       <div
                         key={index}
                         className="w-12 h-12 border-2 border-gray-200 rounded-lg flex items-center justify-center"
                       >
-                        {" "}
                         <span className="text-xl font-bold text-gray-700">
                           {presetCode[index] || ""}
-                        </span>{" "}
+                        </span>
                       </div>
-                    ))}{" "}
-                  </div>{" "}
+                    ))}
+                  </div>
                   <div className="grid grid-cols-3 gap-2 mb-3">
-                    {" "}
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => (
                       <button
                         key={digit}
                         onClick={() => handlePresetCodeInput(digit.toString())}
                         className="h-10 bg-gray-50 rounded-lg text-lg font-semibold hover:bg-gray-100 transition-colors"
                       >
-                        {" "}
-                        {digit}{" "}
+                        {digit}
                       </button>
-                    ))}{" "}
-                    <div></div>{" "}
+                    ))}
+                    <div></div>
                     <button
                       onClick={() => handlePresetCodeInput("0")}
                       className="h-10 bg-gray-50 rounded-lg text-lg font-semibold hover:bg-gray-100 transition-colors"
                     >
-                      {" "}
-                      0{" "}
-                    </button>{" "}
+                      0
+                    </button>
                     <button
                       onClick={handlePresetCodeDelete}
                       className="h-10 bg-gray-50 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors"
                     >
-                      {" "}
-                      <i className="ri-delete-back-line text-lg"></i>{" "}
-                    </button>{" "}
-                  </div>{" "}
+                      <i className="ri-delete-back-line text-lg"></i>
+                    </button>
+                  </div>
                   <p className="text-xs text-gray-500 text-center">
                     코드를 설정하지 않으면 자동으로 생성됩니다
-                  </p>{" "}
-                </div>{" "}
+                  </p>
+                </div>
                 <div className="flex space-x-3">
-                  {" "}
                   <button
                     onClick={() => setShowAttendanceModal(false)}
                     className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium"
                   >
-                    {" "}
-                    취소{" "}
-                  </button>{" "}
+                    취소
+                  </button>
                   <button
                     onClick={handleStartAttendance}
                     className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium"
                   >
-                    {" "}
-                    출석 시작{" "}
-                  </button>{" "}
-                </div>{" "}
+                    출석 시작
+                  </button>
+                </div>
               </>
             ) : (
               <>
-                {" "}
                 <div className="text-center mb-6">
-                  {" "}
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">
                     출석 코드
-                  </h3>{" "}
+                  </h3>
                   <p className="text-sm text-gray-600">
                     {selectedActivity.title}
-                  </p>{" "}
-                </div>{" "}
+                  </p>
+                </div>
                 <div className="bg-blue-50 rounded-xl p-6 mb-6 text-center">
-                  {" "}
                   <div className="flex items-center justify-center mb-4">
-                    {" "}
                     <div className="flex space-x-2 justify-center">
-                      {" "}
                       {attendanceCode.split("").map((digit, index) => (
                         <div
                           key={index}
                           className="w-12 h-12 bg-white rounded-lg flex items-center justify-center"
                         >
-                          {" "}
                           <span className="text-2xl font-bold text-blue-600">
                             {digit}
-                          </span>{" "}
+                          </span>
                         </div>
-                      ))}{" "}
-                    </div>{" "}
-                  </div>{" "}
+                      ))}
+                    </div>
+                  </div>
                   <p className="text-sm text-gray-600">
                     멤버들에게 이 코드를 알려주세요
-                  </p>{" "}
-                </div>{" "}
+                  </p>
+                </div>
                 <div className="bg-orange-50 rounded-lg p-3 mb-4 text-center">
-                  {" "}
                   <div className="flex items-center justify-center space-x-2 mb-2">
-                    {" "}
-                    <i className="ri-time-line text-orange-600"></i>{" "}
-                    <span className="text-sm text-orange-700">남은 시간</span>{" "}
-                  </div>{" "}
+                    <i className="ri-time-line text-orange-600"></i>
+                    <span className="text-sm text-orange-700">남은 시간</span>
+                  </div>
                   <div className="text-2xl font-bold text-orange-600">
                     {formatTimeLeft(timeLeft)}
-                  </div>{" "}
+                  </div>
                   {timeLeft <= 300 && timeLeft > 0 && (
                     <p className="text-xs text-orange-600 mt-1">
                       출석 마감이 임박했습니다!
                     </p>
-                  )}{" "}
-                </div>{" "}
+                  )}
+                </div>
                 {timeLeft > 0 && (
                   <div className="mb-6">
-                    {" "}
                     <div className="grid grid-cols-3 gap-2">
-                      {" "}
                       {[5, 10, 15].map((minutes) => (
                         <button
                           key={minutes}
                           onClick={() => handleExtendTime(minutes)}
                           className="py-1 px-2 bg-green-100 text-green-700 rounded text-sm font-medium hover:bg-green-200"
                         >
-                          {" "}
-                          +{minutes}분{" "}
+                          +{minutes}분
                         </button>
-                      ))}{" "}
-                    </div>{" "}
+                      ))}
+                    </div>
                   </div>
-                )}{" "}
+                )}
                 <div className="flex space-x-3">
-                  {" "}
                   <button
                     onClick={() => handleCloseAttendance(selectedActivity.id)}
                     className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium"
                   >
-                    {" "}
-                    출석 종료{" "}
-                  </button>{" "}
-                </div>{" "}
+                    출석 종료
+                  </button>
+                </div>
               </>
-            )}{" "}
-          </div>{" "}
+            )}
+          </div>
         </div>
       )}
       {showTimeEndModal && selectedActivity && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          {" "}
           <div className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[85vh] overflow-y-auto">
-            {" "}
             <div className="text-center mb-6">
-              {" "}
               <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                {" "}
-                <i className="ri-time-line text-2xl text-orange-600"></i>{" "}
-              </div>{" "}
+                <i className="ri-time-line text-2xl text-orange-600"></i>
+              </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 출석 시간 종료
-              </h3>{" "}
-              <p className="text-sm text-gray-600">{selectedActivity.title}</p>{" "}
-            </div>{" "}
+              </h3>
+              <p className="text-sm text-gray-600">{selectedActivity.title}</p>
+            </div>
             <div className="mb-6">
-              {" "}
               <h4 className="text-sm font-medium text-gray-700 mb-3">
                 추가 시간 설정
-              </h4>{" "}
+              </h4>
               <div className="grid grid-cols-4 gap-2 mb-3">
-                {" "}
                 {[5, 10, 15, 30].map((minutes) => (
                   <button
                     key={minutes}
                     onClick={() => handleExtendFromEndModal(minutes)}
                     className="py-2 px-3 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors"
                   >
-                    {" "}
-                    +{minutes}분{" "}
+                    +{minutes}분
                   </button>
-                ))}{" "}
-              </div>{" "}
+                ))}
+              </div>
               <p className="text-xs text-gray-500 text-center">
                 시간을 연장하면 출석이 다시 시작됩니다
-              </p>{" "}
-            </div>{" "}
+              </p>
+            </div>
             <div className="flex space-x-3">
-              {" "}
               <button
                 onClick={handleFinalClose}
                 className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium"
               >
-                {" "}
-                출석 완료{" "}
-              </button>{" "}
-            </div>{" "}
-          </div>{" "}
+                출석 완료
+              </button>
+            </div>
+          </div>
         </div>
       )}
-
-      {/* ❗ 5. 프로필 편집 모달 UI 수정 */}
       {showProfileEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col">
